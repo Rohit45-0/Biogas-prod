@@ -23,9 +23,10 @@ export default function Home(){
   };
   const update=(key:keyof Inputs,value:string)=>setInputs(v=>({...v,[key]:key==="feedstock"?value:Number(value)}));
   const applyBestSetpoints=()=>{if(!result)return; setInputs(v=>({...v,...result.bestSetpoints})); setMessages(m=>[...m,{role:"ai",text:"I applied the best modeled scenario setpoints to the form. Run the prediction again to compare them with your prior input."}]);};
-  const ask=async(e?:FormEvent,q?:string)=>{e?.preventDefault(); const text=(q??question).trim(); if(!text)return; setMessages(m=>[...m,{role:"user",text}]);setQuestion("");setChatBusy(true);
-    const res=await fetch("/api/copilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,inputs,prediction:result})}); const data=await res.json();
-    setMessages(m=>[...m,{role:"ai",text:data.answer}]);setChatBusy(false);
+  const ask=async(e?:FormEvent,q?:string)=>{e?.preventDefault(); const text=(q??question).trim(); if(!text)return; const chatHistory=[...messages.slice(-5),{role:"user",text}]; setMessages(m=>[...m,{role:"user",text}]);setQuestion("");setChatBusy(true);
+    try { const res=await fetch("/api/copilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,inputs,prediction:result,history:chatHistory})}); const data=await res.json();
+      const evidence=Array.isArray(data.sources)&&data.sources.length?`\n\nEvidence: ${data.sources.slice(0,3).join("; ")}`:""; setMessages(m=>[...m,{role:"ai",text:`${data.answer||"I couldn't complete that answer."}${evidence}`}]);
+    } catch { setMessages(m=>[...m,{role:"ai",text:"I couldn't reach the knowledge service. Please try again in a moment."}]); } finally { setChatBusy(false); }
   };
   const shown=result??{biogas:50,methanePct:59,methane:29.5,electricity:105.9,carbon:0.19,codRemoval:78,stability:78,confidence:82,improvement:0,pressure:19,h2s:340,recommendations:[],forecast:[50,51,50,52,53,52,54,55,55,56,58,57]};
   const points=useMemo(()=>shown.forecast.map((v,i)=>`${i*(100/(shown.forecast.length-1))},${90-(v/Math.max(...shown.forecast))*68}`).join(" "),[shown.forecast]);
