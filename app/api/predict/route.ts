@@ -21,6 +21,8 @@ function predictLinear(values:number[], coefficients:number[]) {
 
 export async function POST(req:Request) {
   const x = await req.json();
+  const previousBiogas = Number(x.previousRun?.prediction?.biogas);
+  const hasPreviousRun = Number.isFinite(previousBiogas);
   const raw = [Number(x.feedRate), Number(x.temperature), Number(x.ph), Number(x.olr), Number(x.hrt)];
   const outOfRange = raw.some((value, index) => value < bounds[index][0] || value > bounds[index][1]);
   const values = raw.map((value, index) => clamp(value, bounds[index][0], bounds[index][1]));
@@ -47,7 +49,10 @@ export async function POST(req:Request) {
   if (outOfRange) recs.unshift({title:"Input clipped to the model range",detail:"One or more values are outside the synthetic training data; results are low-confidence boundary estimates.",impact:0,tone:"down"});
 
   const forecast = Array.from({length:12},(_,i)=>biogas*(.965 + Math.sin(i*1.2)*.014 + i*.002));
-  const agentMessage = `Analysis complete. The scenario model estimates ${biogas.toFixed(1)} m³/day biogas, ${methanePct.toFixed(1)}% methane, and ${electricity.toFixed(1)} kWh/day. For the best modeled methane/electricity result, use pH ${bestSetpoints.ph.toFixed(2)}, ${bestSetpoints.temperature.toFixed(1)}°C, OLR ${bestSetpoints.olr.toFixed(1)} kg VS/m³·d, and ${bestSetpoints.hrt} h HRT. ${outOfRange ? "Your input is outside the synthetic training range, so treat this as exploratory only." : "Ask me why, compare options, or apply these setpoints."}`;
+  const comparison = hasPreviousRun
+    ? ` Compared with your previous run, biogas is ${biogas >= previousBiogas ? "+" : ""}${(biogas - previousBiogas).toFixed(1)} m3/day.`
+    : " This is the first run in the comparison.";
+  const agentMessage = `Analysis complete for your current inputs: ${values[1].toFixed(1)} C, pH ${values[2].toFixed(2)}, OLR ${values[3].toFixed(1)} kg VS/m3/day, and ${values[4].toFixed(1)} h HRT. The scenario model estimates ${biogas.toFixed(1)} m3/day biogas, ${methanePct.toFixed(1)}% methane, and ${electricity.toFixed(1)} kWh/day.${comparison} The best-setpoint target remains pH ${bestSetpoints.ph.toFixed(2)}, ${bestSetpoints.temperature.toFixed(1)} C, OLR ${bestSetpoints.olr.toFixed(1)} kg VS/m3/day, and ${bestSetpoints.hrt} h because this fitted linear scenario model has one fixed global optimum. ${outOfRange ? "Your input is outside the synthetic training range, so treat this as exploratory only." : "Ask me to explain the difference or compare options."}`;
 
   return NextResponse.json({biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,recommendations:recs.slice(0,4),forecast,bestSetpoints,agentMessage,modelName:"Synthetic Scenario Ridge Model",modelFit:"R² 0.996 on supplied synthetic data",outOfRange});
 }

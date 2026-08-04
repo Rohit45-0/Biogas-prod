@@ -16,15 +16,17 @@ export default function Home(){
   const [chatOpen,setChatOpen]=useState(false); const [question,setQuestion]=useState("");
   const [messages,setMessages]=useState<{role:string;text:string}[]>([{role:"ai",text:"I’m Aqua Copilot. Ask me about this plant, the prediction, or ways to improve performance."}]);
   const [chatBusy,setChatBusy]=useState(false); const [history,setHistory]=useState<{time:string;biogas:number;electricity:number}[]>([]);
+  const [lastRunInputs,setLastRunInputs]=useState<Inputs|null>(null);
 
   const predict=async()=>{ setLoading(true); setResult(null); await new Promise(r=>setTimeout(r,1050));
-    const res=await fetch("/api/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(inputs)});
-    const data=await res.json(); setResult(data); setHistory(h=>[{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),biogas:data.biogas,electricity:data.electricity},...h].slice(0,4)); setMessages(m=>[...m,{role:"ai",text:data.agentMessage}]); setLoading(false); setChatOpen(true);
+    const previousRun=result&&lastRunInputs?{prediction:result,inputs:lastRunInputs}:null;
+    const res=await fetch("/api/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...inputs,previousRun})});
+    const data=await res.json(); setResult(data); setLastRunInputs({...inputs}); setHistory(h=>[{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),biogas:data.biogas,electricity:data.electricity},...h].slice(0,4)); setMessages(m=>[...m,{role:"ai",text:data.agentMessage}]); setLoading(false); setChatOpen(true);
   };
   const update=(key:keyof Inputs,value:string)=>setInputs(v=>({...v,[key]:key==="feedstock"?value:Number(value)}));
   const applyBestSetpoints=()=>{if(!result)return; setInputs(v=>({...v,...result.bestSetpoints})); setMessages(m=>[...m,{role:"ai",text:"I applied the best modeled scenario setpoints to the form. Run the prediction again to compare them with your prior input."}]);};
-  const ask=async(e?:FormEvent,q?:string)=>{e?.preventDefault(); const text=(q??question).trim(); if(!text)return; const chatHistory=[...messages.slice(-5),{role:"user",text}]; setMessages(m=>[...m,{role:"user",text}]);setQuestion("");setChatBusy(true);
-    try { const res=await fetch("/api/copilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,inputs,prediction:result,history:chatHistory})}); const data=await res.json();
+  const ask=async(e?:FormEvent,q?:string)=>{e?.preventDefault(); const text=(q??question).trim(); if(!text)return; const chatHistory=[...messages.slice(-5),{role:"user",text}]; const predictionForChat=result&&lastRunInputs&&["feedstock","feedRate","temperature","ph","olr","hrt","codIn","vfa","mixing"].every(key=>inputs[key as keyof Inputs]===lastRunInputs[key as keyof Inputs])?result:null; setMessages(m=>[...m,{role:"user",text}]);setQuestion("");setChatBusy(true);
+    try { const res=await fetch("/api/copilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,inputs,prediction:predictionForChat,history:chatHistory})}); const data=await res.json();
       const evidence=Array.isArray(data.sources)&&data.sources.length?`\n\nEvidence: ${data.sources.slice(0,3).join("; ")}`:""; setMessages(m=>[...m,{role:"ai",text:`${data.answer||"I couldn't complete that answer."}${evidence}`}]);
     } catch { setMessages(m=>[...m,{role:"ai",text:"I couldn't reach the knowledge service. Please try again in a moment."}]); } finally { setChatBusy(false); }
   };
