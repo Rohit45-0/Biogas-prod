@@ -43,9 +43,9 @@ export default function Home(){
 
       <section className="kpis">
         <Kpi label="AI Readiness" value="87%" color="#1e87f0" note="Prototype ready"/>
-        <Kpi label="Scenario Fit" value="99.6%" color="#6d28d9" note="synthetic data only"/>
-        <Kpi label="Digital Twin" value={loading?"RUN":"SIM"} color="#18a957" note={loading?"Simulating plant":"Synthetic HRT model"}/>
-        <Kpi label="Optimization Gain" value={`+${shown.improvement.toFixed(1)}%`} color="#f97316" note="vs. fixed baseline"/>
+        <Kpi label="Model Confidence" value={`${shown.confidence.toFixed(0)}%`} color="#6d28d9" note="Synthetic scenario ML"/>
+        <Kpi label="Digital Twin" value={loading?"RUN":"ACTIVE"} color="#18a957" note={loading?"Simulating plant":"Manual input mode"}/>
+        <Kpi label="Optimization Gain" value={`+${shown.improvement.toFixed(1)}%`} color="#f97316" note="vs. baseline"/>
       </section>
 
       <section className="main-grid">
@@ -63,11 +63,11 @@ export default function Home(){
           <button className="predict" onClick={predict} disabled={loading}>{loading?<><span className="spinner"></span> Agent analyzing plant conditions…</>:<>✦ Run AI prediction</>}</button>
         </div>
 
-        <div className="card optimization"><Title title="AI OPTIMIZATION ENGINE" badge={result?"SCENARIO ML":"AWAITING INPUT"}/>
+        <div className="card optimization"><Title title="AI OPTIMIZATION ENGINE" badge={result?"NEW ANALYSIS":"AWAITING INPUT"}/>
           {loading?<AgentSteps/>:result?<><div className="metric-grid">
             <Metric label="Biogas production" value={`${result.biogas.toFixed(1)} m³/d`} delta={`+${result.improvement.toFixed(1)}%`}/><Metric label="Methane content" value={`${result.methanePct.toFixed(1)}%`} delta="Predicted"/>
             <Metric label="Electricity output" value={`${result.electricity.toFixed(1)} kWh/d`} delta="Net potential"/><Metric label="Carbon reduction" value={`${result.carbon.toFixed(2)} tCO₂e/d`} delta="Estimated"/>
-          </div><div className="agent-summary"><div><b>Agent recommendation ready</b><small>{result.modelName} · {result.modelFit}</small></div><button onClick={applyBestSetpoints}>Apply best setpoints</button></div><h3 className="rec-title">AI agent recommendations</h3><div className="recommendations">{result.recommendations.map((r,i)=><div className="recommendation" key={i}><span className={r.tone}>↗</span><div><b>{r.title}</b><small>{r.detail}</small></div><em>{r.impact ? `+${r.impact.toFixed(1)}%` : "Check"}</em></div>)}</div></>:<div className="empty"><span>✦</span><b>Ready to optimize</b><p>Enter a research scenario with 2–24 hour HRT. The agent will calculate outputs and suggest the best modeled setpoints.</p></div>}
+          </div><h3 className="rec-title">AI agent recommendations</h3><div className="recommendations">{result.recommendations.map((r,i)=><div className="recommendation" key={i}><span className={r.tone}>↗</span><div><b>{r.title}</b><small>{r.detail}</small></div><em>{r.impact ? `+${r.impact.toFixed(1)}%` : "Check"}</em></div>)}</div></>:<div className="empty"><span>✦</span><b>Ready to optimize</b><p>Enter current plant conditions and run a prediction. The agent will calculate outputs and suggest safe adjustments.</p></div>}
         </div>
       </section>
 

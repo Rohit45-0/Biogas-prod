@@ -1,0 +1,8 @@
+/* Preserve the desktop command-center composition while preventing card overflow. */
+.workspace{min-width:0;overflow-x:hidden}
+.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi{min-width:0}
+.kpi>div:last-child{min-width:0}
+.kpi small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ring.wide-value b{font-size:13px;white-space:nowrap}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
