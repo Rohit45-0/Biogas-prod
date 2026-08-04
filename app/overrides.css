@@ -1,0 +1,50 @@
+/* Prevent dashboard cards from forcing horizontal scroll on medium viewports. */
+.workspace{max-width:none;min-width:0}
+.kpis,.main-grid,.lower-grid,.input-layout,.form-grid{min-width:0}
+.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi{min-width:0;padding:14px}
+.kpi>div:last-child{min-width:0}
+.kpi small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ring{flex:0 0 66px}
+.ring b{white-space:nowrap;font-size:15px}
+.ring.wide-value b{font-size:12px}
+.agent-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;margin-top:10px;border:1px solid #cde4ff;border-radius:9px;background:#f2f8ff}
+.agent-summary b,.agent-summary small{display:block;font-size:10px}
+.agent-summary small{color:#61728b;margin-top:3px}
+.agent-summary button{flex:0 0 auto;border:0;border-radius:7px;background:#0877f9;color:#fff;padding:8px 10px;font-size:10px;font-weight:700;cursor:pointer}
+.chat{max-width:calc(100vw - 28px)}
+
+@media(max-width:1280px){
+  .sidebar{width:76px}
+  .brand div,.nav:not(.active){font-size:0}
+  .nav span{font-size:18px}
+  .copilot-mini b,.copilot-mini small,.copilot-mini em,.copyright{display:none}
+  .workspace{margin-left:76px;width:calc(100% - 76px);padding:20px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .main-grid,.lower-grid{grid-template-columns:1fr}
+  .header-actions .date{display:none}
+}
+@media(max-width:760px){
+  .sidebar{display:none}
+  .workspace{margin:0;width:100%;padding:14px}
+  .kpis{grid-template-columns:1fr 1fr}
+  .main-grid{display:block}
+  .optimization{margin-top:12px}
+  .input-layout{grid-template-columns:1fr}
+  .twin-wrap{min-height:250px}
+  header{align-items:flex-start;gap:10px}
+  .header-actions{justify-content:flex-end;flex-wrap:wrap}
+  .header-actions .online,.avatar{display:none}
+  .chat{inset:10px;width:auto;height:auto}
+  .form-grid{grid-template-columns:1fr 1fr}
+  footer{flex-wrap:wrap;gap:9px}
+  footer small{margin-left:0;width:100%}
+}
+@media(max-width:480px){
+  .kpis,.form-grid{grid-template-columns:1fr}
+  .workspace{padding:12px}
+  .kpi{min-height:80px}
+  .header-actions{display:none}
+  .agent-summary{align-items:flex-start;flex-direction:column}
+  .agent-summary button{width:100%}
+}
