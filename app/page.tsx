@@ -3,7 +3,8 @@
 import { FormEvent, useMemo, useState } from "react";
 
 type Inputs = { feedstock:string; feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number };
-type Prediction = { biogas:number; methanePct:number; methane:number; electricity:number; carbon:number; codRemoval:number; stability:number; confidence:number; improvement:number; pressure:number; h2s:number; recommendations:{title:string;detail:string;impact:number;tone:string}[]; forecast:number[]; bestSetpoints:{feedRate:number;temperature:number;ph:number;olr:number;hrt:number;codIn:number;vfa:number;mixing:number}; agentMessage:string; modelName:string; modelFit:string; outOfRange:boolean; confidenceMeaning?:string };
+type OptimizationTarget = { label:string; value:number };
+type Prediction = { biogas:number; methanePct:number; methane:number; electricity:number; carbon:number; codRemoval:number; stability:number; confidence:number; improvement:number; pressure:number; h2s:number; generatorKw:number; optimizationTargets:OptimizationTarget[]; overallBenefit:number; benefitTrend:number[]; recommendations:{title:string;detail:string;impact:number;tone:string}[]; forecast:number[]; bestSetpoints:{feedRate:number;temperature:number;ph:number;olr:number;hrt:number;codIn:number;vfa:number;mixing:number}; agentMessage:string; modelName:string; modelFit:string; outOfRange:boolean; confidenceMeaning?:string };
 
 const initial: Inputs = { feedstock:"Dairy WW", feedRate:846, temperature:35, ph:7.1, olr:3.5, hrt:22, codIn:7000, vfa:1100, mixing:50 };
 
@@ -17,6 +18,7 @@ export default function Home(){
   const [messages,setMessages]=useState<{role:string;text:string}[]>([{role:"ai",text:"I’m Aqua Copilot. Ask me about this plant, the prediction, or ways to improve performance."}]);
   const [chatBusy,setChatBusy]=useState(false); const [history,setHistory]=useState<{time:string;biogas:number;electricity:number}[]>([]);
   const [lastRunInputs,setLastRunInputs]=useState<Inputs|null>(null);
+  const [detailsOpen,setDetailsOpen]=useState(false);
 
   const predict=async()=>{ setLoading(true); setResult(null); await new Promise(r=>setTimeout(r,1050));
     const previousRun=result&&lastRunInputs?{prediction:result,inputs:lastRunInputs}:null;
@@ -32,6 +34,8 @@ export default function Home(){
   };
   const shown=result??{biogas:3443.1,methanePct:65.5,methane:2255.2,electricity:1224.2,carbon:.87,codRemoval:80,stability:90,confidence:94,improvement:19.5,pressure:21,h2s:527,recommendations:[],forecast:[3357,3374,3388,3396,3410,3423,3436,3443,3451,3464,3472,3485]};
   const points=useMemo(()=>shown.forecast.map((v,i)=>`${i*(100/(shown.forecast.length-1))},${90-(v/Math.max(...shown.forecast))*68}`).join(" "),[shown.forecast]);
+  const benefitValues=result?.benefitTrend??[4.4,5.1,5.8,5.4,6.7,7.1,7.8,8.4];
+  const benefitPoints=useMemo(()=>{const min=Math.min(...benefitValues),max=Math.max(...benefitValues),span=max-min||1;return benefitValues.map((value,index)=>`${index*(100/(benefitValues.length-1))},${34-((value-min)/span)*27}`).join(" ")},[benefitValues]);
 
   return <main className="shell">
     <aside className="sidebar">
@@ -67,11 +71,8 @@ export default function Home(){
           <button className="predict" onClick={predict} disabled={loading}>{loading?<><span className="spinner"></span> Agent analyzing plant conditions…</>:<>✦ Run AI prediction</>}</button>
         </div>
 
-        <div className="card optimization"><Title title="AI OPTIMIZATION ENGINE" badge={result?"NEW ANALYSIS":"AWAITING INPUT"}/>
-          {loading?<AgentSteps/>:result?<><div className="metric-grid">
-            <Metric label="Biogas production" value={`${result.biogas.toFixed(1)} m³/d`} delta={`+${result.improvement.toFixed(1)}%`}/><Metric label="Methane content" value={`${result.methanePct.toFixed(1)}%`} delta="Predicted"/>
-            <Metric label="Electricity output" value={`${result.electricity.toFixed(1)} kWh/d`} delta="Net potential"/><Metric label="Carbon reduction" value={`${result.carbon.toFixed(2)} tCO₂e/d`} delta="Estimated"/>
-          </div><h3 className="rec-title">AI agent recommendations</h3><div className="recommendations">{result.recommendations.map((r,i)=><div className="recommendation" key={i}><span className={r.tone}>↗</span><div><b>{r.title}</b><small>{r.detail}</small></div><em>{r.impact ? `+${r.impact.toFixed(1)}%` : "Check"}</em></div>)}</div></>:<div className="empty"><span>✦</span><b>Ready to optimize</b><p>Enter current plant conditions and run a prediction. The agent will calculate outputs and suggest safe adjustments.</p></div>}
+        <div className="card optimization"><Title title="AI OPTIMIZATION ENGINE" badge={result?"LIVE REPORT":"AWAITING INPUT"}/>
+          {loading?<AgentSteps/>:result?<OptimizationReport result={result} benefitPoints={benefitPoints} onDetails={()=>setDetailsOpen(true)}/>:<div className="empty"><span>✦</span><b>Ready to optimize</b><p>Enter current plant conditions and run a prediction. Every report panel will refresh from the new scenario.</p></div>}
         </div>
       </section>
 
@@ -84,8 +85,12 @@ export default function Home(){
     </section>
 
     {chatOpen&&<div className="chat"><div className="chat-head"><div><span>✦</span><b>Aqua Copilot</b><small>Data-aware assistant</small></div><button onClick={()=>setChatOpen(false)}>×</button></div><div className="messages">{messages.map((m,i)=><div key={i} className={`message ${m.role}`}>{m.text}</div>)}{chatBusy&&<div className="message ai typing"><i></i><i></i><i></i></div>}</div><div className="quick">{result&&<button onClick={applyBestSetpoints}>Apply best setpoints</button>}{quickQuestions.map(q=><button onClick={()=>ask(undefined,q)} key={q}>{q}</button>)}</div><form onSubmit={ask}><input value={question} onChange={e=>setQuestion(e.target.value)} placeholder="Ask about this scenario…"/><button>➤</button></form></div>}
+    {detailsOpen&&result&&<div className="details-backdrop" onClick={()=>setDetailsOpen(false)}><section className="details-modal" onClick={event=>event.stopPropagation()}><div className="details-head"><div><small>DYNAMIC PREDICTION REPORT</small><h2>Optimization details</h2></div><button onClick={()=>setDetailsOpen(false)}>×</button></div><div className="details-kpis"><Metric label="Biogas" value={`${result.biogas.toFixed(1)} m³/d`} delta={`${result.improvement>=0?"+":""}${result.improvement.toFixed(1)}% vs baseline`}/><Metric label="Methane" value={`${result.methanePct.toFixed(1)}%`} delta={`${result.methane.toFixed(1)} m³ CH₄/d`}/><Metric label="Electricity" value={`${result.electricity.toFixed(1)} kWh/d`} delta={`${result.generatorKw.toFixed(1)} kW generator`}/><Metric label="Carbon reduction" value={`${result.carbon.toFixed(2)} tCO₂e/d`} delta="Estimated"/></div><div className="details-table">{result.optimizationTargets.map((target,index)=><div key={target.label}><span>{index+1}. {target.label}</span><b className={target.value>=0?"positive":"negative"}>{target.value>=0?"+":""}{target.value.toFixed(1)}%</b></div>)}</div><p className="details-note"><b>{result.modelName}</b> · {result.modelFit}. Scenario coverage {result.confidence.toFixed(0)}% is an input-space score, not validated plant accuracy.</p><button className="details-apply" onClick={()=>{applyBestSetpoints();setDetailsOpen(false)}}>Apply modeled setpoints</button></section></div>}
   </main>
 }
+
+const targetIcons=["◈","ϟ","♨","◇","◉","♨","●"];
+function OptimizationReport({result,benefitPoints,onDetails}:{result:Prediction;benefitPoints:string;onDetails:()=>void}){return <div className="optimization-report"><div className="optimization-columns"><section className="target-panel"><h3>Optimization Targets</h3><div className="target-list">{result.optimizationTargets.map((target,index)=><div className="target-row" key={target.label}><span className={`target-icon c${index}`}>{targetIcons[index]}</span><b>{target.label}</b><em className={target.value>=0?"positive":"negative"}>{target.value>=0?"+":""}{target.value.toFixed(1)}% <i>{target.value>=0?"↑":"↓"}</i></em></div>)}</div></section><div className="optimization-side"><section className="rec-panel"><h3>AI Recommendations</h3><div className="compact-recs">{result.recommendations.map((recommendation,index)=><div className="compact-rec" key={recommendation.title}><span>{index+1}</span><div><b>{recommendation.title}</b><small>{recommendation.detail}</small></div><em>{recommendation.impact?`+${recommendation.impact.toFixed(1)}%`:"Check"}</em></div>)}</div></section><section className="benefit-panel"><div><small>Predicted Overall Benefit</small><b className={result.overallBenefit>=0?"positive":"negative"}>{result.overallBenefit>=0?"+":""}{result.overallBenefit.toFixed(1)}%</b><span>Performance improvement</span></div><svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Overall benefit trend"><polyline points={benefitPoints} fill="none" stroke={result.overallBenefit>=0?"#128a70":"#df5d54"} strokeWidth="2" vectorEffect="non-scaling-stroke"/></svg></section></div></div><button className="optimization-details" onClick={onDetails}>View Optimization Details</button></div>}
 
 function Title({title,badge}:{title:string;badge:string}){return <div className="card-title"><h2>{title}</h2><span>{badge}</span></div>}
 function Kpi({label,value,color,note}:{label:string;value:string;color:string;note:string}){return <div className="kpi card"><div className={`ring ${value.length>5?"wide-value":""}`} style={{"--color":color} as React.CSSProperties}><b>{value}</b></div><div><span>{label}</span><small>{note}</small><i style={{background:color}}></i></div></div>}

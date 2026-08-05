@@ -82,6 +82,7 @@ export async function POST(req:Request) {
   const baseGasAfter = weightedValue(weights,"gasAfter");
   const baseMethaneBefore = weightedValue(weights,"methaneBefore");
   const baseMethaneAfter = weightedValue(weights,"methaneAfter");
+  const baseGeneratorBefore = weightedValue(weights,"generatorBefore");
   const baseGeneratorAfter = weightedValue(weights,"generatorAfter");
 
   // Feed-rate response is calibrated from the supplied 10-run validation trend.
@@ -109,6 +110,20 @@ export async function POST(req:Request) {
   const codRemoval = clamp(72+(methanePct-55)*.55+(safe.hrt-15)*.35-Math.abs(safe.vfa-1100)/250,52,92);
   const pressure = clamp(11+gasFlow*.07,12,42);
   const h2s = clamp(620-(safe.ph-6.8)*310+(safe.vfa-1100)*.13,60,1500);
+  const baselineMethaneFlow = baseGasBefore*feedFactor*baseMethaneBefore/100;
+  const methaneGain = (gasFlow*methanePct/100/baselineMethaneFlow-1)*100;
+  const electricityGain = (generatorKw/(baseGeneratorBefore*feedFactor)-1)*100;
+  const optimizationTargets = [
+    {label:"Methane Production",value:methaneGain},
+    {label:"Electricity Output",value:electricityGain},
+    {label:"COD Removal",value:codRemoval-65},
+    {label:"Gas Stability",value:stability-70},
+    {label:"Generator Efficiency",value:electricityGain*.72},
+    {label:"Boiler Fuel Saving",value:methaneGain*.58},
+    {label:"Carbon Reduction",value:electricityGain},
+  ];
+  const overallBenefit = clamp(optimizationTargets.reduce((sum,target)=>sum+target.value,0)/optimizationTargets.length,-20,65);
+  const benefitTrend = Array.from({length:8},(_,index)=>overallBenefit*(.58+index*.055)+Math.sin(index*1.15)*Math.max(1,Math.abs(overallBenefit)*.045));
 
   const recommendations:{title:string;detail:string;impact:number;tone:string}[] = [];
   const add = (title:string,detail:string,impact:number)=>recommendations.push({title,detail,impact:Math.max(.2,impact),tone:"up"});
@@ -129,5 +144,5 @@ export async function POST(req:Request) {
   const forecast = Array.from({length:12},(_,index)=>biogas*(.975+Math.sin(index*1.2)*.012+index*.0015));
   const agentMessage = `Analysis complete for ${feedstock}: feed ${safe.feedRate.toFixed(0)} kg VS/day, ${safe.temperature.toFixed(1)} C, pH ${safe.ph.toFixed(2)}, OLR ${safe.olr.toFixed(2)}, HRT ${safe.hrt.toFixed(1)} days, COD ${safe.codIn.toFixed(0)} mg/L, VFA ${safe.vfa.toFixed(0)} mg/L, and mixing ${safe.mixing.toFixed(0)} RPM. The multi-input scenario model estimates ${biogas.toFixed(1)} m3/day biogas, ${methanePct.toFixed(1)}% methane, and ${electricity.toFixed(1)} kWh/day.${comparison} Scenario coverage is ${confidence.toFixed(0)}%; this is input-space coverage, not validated plant accuracy.`;
 
-  return NextResponse.json({biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,recommendations:recommendations.slice(0,4),forecast,bestSetpoints,agentMessage,modelName:"Multi-Input Scenario Ensemble",modelFit:"10 optimization anchors + 1,000-row SCADA coverage",outOfRange,confidenceMeaning:"Scenario coverage, not calibrated uncertainty"});
+  return NextResponse.json({biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,4),forecast,bestSetpoints,agentMessage,modelName:"Multi-Input Scenario Ensemble",modelFit:"10 optimization anchors + 1,000-row SCADA coverage",outOfRange,confidenceMeaning:"Scenario coverage, not calibrated uncertainty"});
 }
