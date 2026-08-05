@@ -9,6 +9,12 @@ export type KnowledgeChunk = {
 // Copilot retrieve project context without exposing the original spreadsheets.
 export const knowledgeChunks: KnowledgeChunk[] = [
   {
+    id: "additional-hrt-cases",
+    source: "10 more cases with days less in HRT on ai and on litterature.xlsx",
+    keywords: ["hrt", "literature", "additional", "cases", "days", "comparison"],
+    text: "This workbook contributes additional short-HRT AI and literature comparison cases to the knowledge base. It is used as supporting research context, not as an active normal-mode model anchor or proof of live-plant performance.",
+  },
+  {
     id: "hours-scale-synthetic",
     source: "AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx",
     keywords: ["hours", "hrt", "2", "24", "synthetic", "range", "temperature", "training"],

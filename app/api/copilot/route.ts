@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { retrieveKnowledge } from "../../lib/rag";
+import { getSession } from "../../lib/auth";
 
 type Inputs = { feedstock?:string; feedRate?: number; temperature?: number; ph?: number; olr?: number; hrt?: number; codIn?:number; vfa?:number; mixing?:number };
 type Prediction = { biogas?: number; methanePct?: number; electricity?: number; carbon?: number; modelName?:string; confidence?:number; bestSetpoints?: { feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number } };
@@ -57,6 +58,7 @@ async function generateAnswer(question: string, inputs: Inputs, prediction: Pred
 }
 
 export async function POST(req: Request) {
+  if (!await getSession(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { question, inputs = {}, prediction = null, history = [] } = await req.json() as { question?: string; inputs?: Inputs; prediction?: Prediction | null; history?: Message[] };
   const text = String(question ?? "").trim();
   if (!text) return NextResponse.json({ answer: "Please enter a question." }, { status: 400 });

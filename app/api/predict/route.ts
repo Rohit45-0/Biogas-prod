@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getSession } from "../../lib/auth";
+import { modelMetadata } from "../../lib/system";
 
 type Scenario = {
   feedstock: string;
@@ -64,6 +66,7 @@ function weightedValue(weights:number[], key:keyof Pick<Scenario,"methaneBefore"
 }
 
 export async function POST(req:Request) {
+  if (!await getSession(req)) return NextResponse.json({error:"Unauthorized"},{status:401});
   const x = await req.json();
   const feedstock = normalizedFeedstock(x.feedstock);
   const input = {
@@ -146,5 +149,5 @@ export async function POST(req:Request) {
   const forecast = Array.from({length:12},(_,index)=>biogas*(.975+Math.sin(index*1.2)*.012+index*.0015));
   const agentMessage = `Analysis complete for ${feedstock}: feed ${safe.feedRate.toFixed(0)} kg VS/day, ${safe.temperature.toFixed(1)} C, pH ${safe.ph.toFixed(2)}, OLR ${safe.olr.toFixed(2)}, HRT ${safe.hrt.toFixed(1)} days, COD ${safe.codIn.toFixed(0)} mg/L, VFA ${safe.vfa.toFixed(0)} mg/L, and mixing ${safe.mixing.toFixed(0)} RPM. The multi-input scenario model estimates ${biogas.toFixed(1)} m3/day biogas, ${methanePct.toFixed(1)}% methane, and ${electricity.toFixed(1)} kWh/day.${comparison} Scenario coverage is ${confidence.toFixed(0)}%; this is input-space coverage, not validated plant accuracy.`;
 
-  return NextResponse.json({biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,4),forecast,bestSetpoints,agentMessage,modelName:"Multi-Input Scenario Ensemble",modelFit:"10 optimization anchors + 1,000-row SCADA coverage",outOfRange,confidenceMeaning:"Scenario coverage, not calibrated uncertainty"});
+  return NextResponse.json({biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,4),forecast,bestSetpoints,agentMessage,modelName:modelMetadata.name,modelVersion:modelMetadata.version,modelFit:modelMetadata.fit,outOfRange,confidenceMeaning:"Scenario coverage, not calibrated uncertainty"});
 }
