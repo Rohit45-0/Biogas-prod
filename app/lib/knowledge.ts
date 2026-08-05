@@ -12,13 +12,13 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "hours-scale-synthetic",
     source: "AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx",
     keywords: ["hours", "hrt", "2", "24", "synthetic", "range", "temperature", "training"],
-    text: "The active prototype training workbook contains 500 synthetic, interpolation/noise-augmented scenarios. It models a 2 to 24 hour HRT research scenario using feed rate, temperature, pH, OLR, and HRT. It is suitable for an interactive digital-twin demonstration, not evidence of live-plant performance.",
+    text: "The 500-row hours-scale workbook is retained in the knowledge base for research questions, but it is no longer the active normal-mode prediction dataset. It models a 2 to 24 hour HRT extrapolation and is suitable for research simulation only, not normal plant recommendations.",
   },
   {
     id: "hours-scale-limits",
     source: "AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx",
     keywords: ["limit", "safe", "operating", "temperature", "35", "37", "65", "clamp", "extrapolation"],
-    text: "The supplied hours-scale synthetic scenario follows a designed trend rather than independent plant measurements. Its active scenario values include approximately 37 to 65.2 C, pH 6.19 to 6.93, OLR 4.43 to 70.4 kg VS/m3/day, and HRT 2 to 24 hours. These are model-input bounds, not recommended operating setpoints.",
+    text: "The supplied hours-scale synthetic scenario follows a designed trend rather than independent plant measurements. Its 2 to 24 hour HRT values are not used by the dashboard's active normal mode, which instead uses SCADA-derived day-scale coverage bounds.",
   },
   {
     id: "projected-under-six-hours",
@@ -42,7 +42,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     id: "optimization-scenarios",
     source: "AQUAIVOLT_10_Biogas_Optimization_10Scenarios.xlsx",
     keywords: ["scenario", "35", "temperature", "ph", "gas flow", "generator", "before", "after ai"],
-    text: "The 10-scenario optimization workbook provides before-AI and after-AI examples for temperature, pH, OLR, HRT, COD, methane percentage, gas flow, and generator power. It includes normal-looking scenario temperatures as low as 35 C, which is separate from the hours-scale synthetic model currently used by the dashboard.",
+    text: "The 10-scenario optimization workbook provides the active model's before-AI and after-AI anchors for feedstock, temperature, pH, OLR, HRT, COD, methane percentage, gas flow, and generator power. It includes normal-mode temperatures from 35 to 38 C and HRT from 18 to 26 days.",
   },
   {
     id: "electricity-calculation",
@@ -51,10 +51,10 @@ export const knowledgeChunks: KnowledgeChunk[] = [
     text: "In the prototype, electricity is derived transparently from predicted methane volume using 9.97 kWh per m3 methane and a 36 percent generator efficiency assumption. Carbon reduction is a prototype estimate based on generated electricity and a configurable grid-emissions factor; use an approved local factor before reporting emissions.",
   },
   {
-    id: "ridge-model",
+    id: "multi-input-model",
     source: "Aquaivolt prototype model card",
-    keywords: ["model", "linear", "ridge", "random", "prediction", "trained", "coefficient"],
-    text: "The dashboard prediction endpoint uses a fitted ridge-regression model, not randomly generated outputs. It predicts biogas and methane fraction from feed rate, temperature, pH, OLR, and HRT using coefficients fitted to the supplied 500-row synthetic hours-scale dataset. Methane volume, electricity, carbon, stability, gas quality, and forecast values are then calculated from those predictions.",
+    keywords: ["model", "multi input", "feedstock", "random", "prediction", "coverage", "scenario"],
+    text: "The active dashboard uses deterministic distance-weighted inference over the supplied 10 optimization scenarios, with feed-rate calibration from the 10-run validation trend and conservative VFA/mixing modifiers. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixer speed all influence the result. Synthetic SCADA ranges define input coverage; the displayed coverage score is not validated prediction accuracy.",
   },
   {
     id: "deployment-safety",

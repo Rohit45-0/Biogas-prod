@@ -3,9 +3,9 @@
 import { FormEvent, useMemo, useState } from "react";
 
 type Inputs = { feedstock:string; feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number };
-type Prediction = { biogas:number; methanePct:number; methane:number; electricity:number; carbon:number; codRemoval:number; stability:number; confidence:number; improvement:number; pressure:number; h2s:number; recommendations:{title:string;detail:string;impact:number;tone:string}[]; forecast:number[]; bestSetpoints:{feedRate:number;temperature:number;ph:number;olr:number;hrt:number;mixing:number}; agentMessage:string; modelName:string; modelFit:string; outOfRange:boolean };
+type Prediction = { biogas:number; methanePct:number; methane:number; electricity:number; carbon:number; codRemoval:number; stability:number; confidence:number; improvement:number; pressure:number; h2s:number; recommendations:{title:string;detail:string;impact:number;tone:string}[]; forecast:number[]; bestSetpoints:{feedRate:number;temperature:number;ph:number;olr:number;hrt:number;codIn:number;vfa:number;mixing:number}; agentMessage:string; modelName:string; modelFit:string; outOfRange:boolean; confidenceMeaning?:string };
 
-const initial: Inputs = { feedstock:"Dairy wastewater", feedRate:870, temperature:37, ph:6.9, olr:4.5, hrt:24, codIn:7000, vfa:1100, mixing:46 };
+const initial: Inputs = { feedstock:"Dairy WW", feedRate:846, temperature:35, ph:7.1, olr:3.5, hrt:22, codIn:7000, vfa:1100, mixing:50 };
 
 const nav = ["Executive Overview","AI Intelligence","Digital Twin","IoT & Sensors","AI Optimization","Prediction Center","Explainable AI","Data & Audit","Settings"];
 const quickQuestions = ["What are the best setpoints?","Explain this prediction","Is my pH safe?"];
@@ -30,7 +30,7 @@ export default function Home(){
       const evidence=Array.isArray(data.sources)&&data.sources.length?`\n\nEvidence: ${data.sources.slice(0,3).join("; ")}`:""; setMessages(m=>[...m,{role:"ai",text:`${data.answer||"I couldn't complete that answer."}${evidence}`}]);
     } catch { setMessages(m=>[...m,{role:"ai",text:"I couldn't reach the knowledge service. Please try again in a moment."}]); } finally { setChatBusy(false); }
   };
-  const shown=result??{biogas:50,methanePct:59,methane:29.5,electricity:105.9,carbon:0.19,codRemoval:78,stability:78,confidence:82,improvement:0,pressure:19,h2s:340,recommendations:[],forecast:[50,51,50,52,53,52,54,55,55,56,58,57]};
+  const shown=result??{biogas:3443.1,methanePct:65.5,methane:2255.2,electricity:1224.2,carbon:.87,codRemoval:80,stability:90,confidence:94,improvement:19.5,pressure:21,h2s:527,recommendations:[],forecast:[3357,3374,3388,3396,3410,3423,3436,3443,3451,3464,3472,3485]};
   const points=useMemo(()=>shown.forecast.map((v,i)=>`${i*(100/(shown.forecast.length-1))},${90-(v/Math.max(...shown.forecast))*68}`).join(" "),[shown.forecast]);
 
   return <main className="shell">
@@ -46,7 +46,7 @@ export default function Home(){
 
       <section className="kpis">
         <Kpi label="AI Readiness" value="87%" color="#1e87f0" note="Prototype ready"/>
-        <Kpi label="Model Confidence" value={`${shown.confidence.toFixed(0)}%`} color="#6d28d9" note="Synthetic scenario ML"/>
+        <Kpi label="Scenario Coverage" value={`${shown.confidence.toFixed(0)}%`} color="#6d28d9" note="Input-space validity score"/>
         <Kpi label="Digital Twin" value={loading?"RUN":"ACTIVE"} color="#18a957" note={loading?"Simulating plant":"Manual input mode"}/>
         <Kpi label="Optimization Gain" value={`+${shown.improvement.toFixed(1)}%`} color="#f97316" note="vs. baseline"/>
       </section>
@@ -54,14 +54,15 @@ export default function Home(){
       <section className="main-grid">
         <div className="card input-card"><Title title="PLANT INPUT & DIGITAL TWIN" badge="MANUAL MODE"/>
           <div className="input-layout"><div className="form-grid">
-            <Field label="Feedstock" value={inputs.feedstock} onChange={v=>update("feedstock",v)} options={["Dairy wastewater","Cow manure","Food waste","Brewery","Paper mill"]}/>
-            <Field label="Feed rate" value={inputs.feedRate} unit="kg VS/d" onChange={v=>update("feedRate",v)} min={866} max={929}/>
-            <Field label="Temperature" value={inputs.temperature} unit="°C" onChange={v=>update("temperature",v)} min={37} max={65.2} step="0.1"/>
-            <Field label="pH level" value={inputs.ph} onChange={v=>update("ph",v)} min={6.19} max={6.93} step="0.01"/>
-            <Field label="Organic loading" value={inputs.olr} unit="kg VS/m³·d" onChange={v=>update("olr",v)} min={4.43} max={70.4} step="0.1"/>
-            <Field label="Retention time" value={inputs.hrt} unit="hours" onChange={v=>update("hrt",v)} min={2} max={24} step="0.1"/>
-            <Field label="COD input" value={inputs.codIn} unit="mg/L" onChange={v=>update("codIn",v)}/>
-            <Field label="Mixer speed" value={inputs.mixing} unit="RPM" onChange={v=>update("mixing",v)}/>
+            <Field label="Feedstock" value={inputs.feedstock} onChange={v=>update("feedstock",v)} options={["Dairy WW","Cow Manure","Food Waste","Brewery","Paper Mill","Mixed Waste"]}/>
+            <Field label="Feed rate" value={inputs.feedRate} unit="kg VS/d" onChange={v=>update("feedRate",v)} min={820} max={870}/>
+            <Field label="Temperature" value={inputs.temperature} unit="°C" onChange={v=>update("temperature",v)} min={34.08} max={38.87} step="0.1"/>
+            <Field label="pH level" value={inputs.ph} onChange={v=>update("ph",v)} min={6.82} max={7.58} step="0.01"/>
+            <Field label="Organic loading" value={inputs.olr} unit="kg COD/m³·d" onChange={v=>update("olr",v)} min={1.55} max={6.38} step="0.1"/>
+            <Field label="Retention time" value={inputs.hrt} unit="days" onChange={v=>update("hrt",v)} min={15.45} max={34.62} step="0.1"/>
+            <Field label="COD input" value={inputs.codIn} unit="mg/L" onChange={v=>update("codIn",v)} min={3205} max={11864}/>
+            <Field label="VFA" value={inputs.vfa} unit="mg/L" onChange={v=>update("vfa",v)} min={251} max={2963}/>
+            <Field label="Mixer speed" value={inputs.mixing} unit="RPM" onChange={v=>update("mixing",v)} min={20} max={79}/>
           </div><div className="twin-wrap"><div className={`twin ${loading?"working":""}`}><div className="pipe"></div><div className="dome"><span>AQUAIVOLT</span></div><div className="tank"><i></i><i></i><i></i><div className="liquid"></div></div><div className="base"></div></div><p>{loading?"AI agent is simulating outcomes…":"Digital twin ready"}</p></div></div>
           <button className="predict" onClick={predict} disabled={loading}>{loading?<><span className="spinner"></span> Agent analyzing plant conditions…</>:<>✦ Run AI prediction</>}</button>
         </div>
@@ -76,7 +77,7 @@ export default function Home(){
 
       <section className="lower-grid">
         <div className="card forecast"><Title title="PREDICTION CENTER" badge="NEXT 24 HOURS"/><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Prediction forecast"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1677ff" stopOpacity=".28"/><stop offset="1" stopColor="#1677ff" stopOpacity="0"/></linearGradient></defs><polygon points={`0,95 ${points} 100,95`} fill="url(#area)"/><polyline points={points} fill="none" stroke="#1677ff" strokeWidth="2" vectorEffect="non-scaling-stroke"/></svg><div className="forecast-stats"><b>{shown.biogas.toFixed(1)}<small> m³/d<br/>Biogas</small></b><b>{shown.methanePct.toFixed(1)}<small>%<br/>CH₄</small></b><b>{shown.electricity.toFixed(1)}<small> kWh/d<br/>Electricity</small></b></div></div>
-        <div className="card health"><Title title="PROCESS HEALTH" badge={`${shown.stability.toFixed(0)}% STABLE`}/><div className="gauges"><Gauge label="COD removal" value={shown.codRemoval}/><Gauge label="Gas stability" value={shown.stability}/><Gauge label="Confidence" value={shown.confidence}/></div><div className="health-list"><span>Pressure <b>{shown.pressure.toFixed(1)} mbar</b></span><span>H₂S prediction <b>{shown.h2s.toFixed(0)} ppm</b></span><span>Data source <b>Human input</b></span></div></div>
+        <div className="card health"><Title title="PROCESS HEALTH" badge={`${shown.stability.toFixed(0)}% STABLE`}/><div className="gauges"><Gauge label="COD removal" value={shown.codRemoval}/><Gauge label="Gas stability" value={shown.stability}/><Gauge label="Input coverage" value={shown.confidence}/></div><div className="health-list"><span>Pressure <b>{shown.pressure.toFixed(1)} mbar</b></span><span>H₂S prediction <b>{shown.h2s.toFixed(0)} ppm</b></span><span>Data source <b>Human input</b></span></div></div>
         <div className="card history"><Title title="RECENT SIMULATIONS" badge={`${history.length} RUNS`}/>{history.length?history.map((h,i)=><div className="history-row" key={i}><span><i className="ok">✓</i>{h.time}</span><b>{h.biogas.toFixed(1)} m³/d</b><em>{h.electricity.toFixed(0)} kWh</em></div>):<div className="no-history">Your predictions will appear here.</div>}<div className="iot-note"><span>◉</span><div><b>IoT-ready architecture</b><small>Manual form can be replaced by live sensor ingestion without changing the prediction contract.</small></div></div></div>
       </section>
       <footer><span><i></i> Cloud API online</span><span><i></i> Scenario ML service online</span><span><i></i> Knowledge base: 6 workbooks</span><small>Synthetic scenario estimates — not live-plant validated.</small></footer>
