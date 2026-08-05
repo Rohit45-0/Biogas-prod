@@ -9,6 +9,8 @@ type Prediction = { biogas:number; methanePct:number; methane:number; electricit
 const initial: Inputs = { feedstock:"Dairy WW", feedRate:846, temperature:35, ph:7.1, olr:3.5, hrt:22, codIn:7000, vfa:1100, mixing:50 };
 
 const nav = ["Executive Overview","AI Intelligence","Digital Twin","IoT & Sensors","AI Optimization","Prediction Center","Explainable AI","Data & Audit","Settings"];
+const futureNav = new Set(["IoT & Sensors","Data & Audit","Settings"]);
+const navTargets:Record<string,string> = {"Executive Overview":"executive-overview","AI Intelligence":"ai-optimization","Digital Twin":"digital-twin","AI Optimization":"ai-optimization","Prediction Center":"prediction-center"};
 const quickQuestions = ["What are the best setpoints?","Explain this prediction","Is my pH safe?"];
 
 export default function Home(){
@@ -28,6 +30,7 @@ export default function Home(){
   };
   const update=(key:keyof Inputs,value:string)=>setInputs(v=>({...v,[key]:key==="feedstock"?value:Number(value)}));
   const openCopilot=()=>{setChatOpen(true);if(result&&lastRunInputs){const key=JSON.stringify(lastRunInputs);if(key!==presentedResultKey){setMessages(messages=>[...messages,{role:"ai",text:result.agentMessage}]);setPresentedResultKey(key);}}};
+  const handleNav=(name:string)=>{if(futureNav.has(name))return;setActive(name);if(name==="Explainable AI"){openCopilot();return;}document.getElementById(navTargets[name]??"executive-overview")?.scrollIntoView({behavior:"smooth",block:"start"});};
   const applyBestSetpoints=()=>{if(!result)return; setInputs(v=>({...v,...result.bestSetpoints})); setMessages(m=>[...m,{role:"ai",text:"I applied the best modeled scenario setpoints to the form. Run the prediction again to compare them with your prior input."}]);};
   const ask=async(e?:FormEvent,q?:string)=>{e?.preventDefault(); const text=(q??question).trim(); if(!text)return; const chatHistory=[...messages.slice(-5),{role:"user",text}]; const predictionForChat=result&&lastRunInputs&&["feedstock","feedRate","temperature","ph","olr","hrt","codIn","vfa","mixing"].every(key=>inputs[key as keyof Inputs]===lastRunInputs[key as keyof Inputs])?result:null; setMessages(m=>[...m,{role:"user",text}]);setQuestion("");setChatBusy(true);
     try { const res=await fetch("/api/copilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:text,inputs,prediction:predictionForChat,history:chatHistory})}); const data=await res.json();
@@ -42,12 +45,12 @@ export default function Home(){
   return <main className="shell">
     <aside className="sidebar">
       <div className="brand"><span className="drop">◒</span><div><b>AQUAIVOLT</b><small>AI PLATFORM</small></div></div>
-      <nav>{nav.map((n,i)=><button key={n} className={active===n?"nav active":"nav"} onClick={()=>setActive(n)}><span>{["⌂","✦","♙","◉","✥","◇","◎","▦","⚙"][i]}</span>{n}</button>)}</nav>
+      <nav>{nav.map((n,i)=>{const future=futureNav.has(n);return <button key={n} className={`nav ${future?"future":"available"} ${active===n?"active":""}`} onClick={()=>handleNav(n)} disabled={future} title={future?"Planned future module":`Open ${n}`}><span>{["⌂","✦","♙","◉","✥","◇","◎","▦","⚙"][i]}</span>{n}{future&&<small>SOON</small>}</button>})}</nav>
       <button className="copilot-mini" onClick={openCopilot}><span className="robot">✦</span><b>AI Copilot Assistant</b><small>Ask about performance, predictions or optimization.</small><em>Start chat →</em></button>
       <div className="copyright">AQUAIVOLT © 2026<br/><small>Prototype • Synthetic data</small></div>
     </aside>
 
-    <section className="workspace">
+    <section className="workspace" id="executive-overview">
       <header><div><h1>AI Command Center</h1><p>Smart Biogas Optimization & Digital Twin Platform</p></div><div className="header-actions"><span className="online">● &nbsp; System Online</span><span className="date">◫ &nbsp; {new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span><button className="ai-btn" onClick={openCopilot}>✦ &nbsp; AI Copilot</button><span className="avatar">AV</span></div></header>
 
       <section className="kpis">
@@ -58,7 +61,7 @@ export default function Home(){
       </section>
 
       <section className="main-grid">
-        <div className="card input-card"><Title title="PLANT INPUT & DIGITAL TWIN" badge="MANUAL MODE"/>
+        <div className="card input-card" id="digital-twin"><Title title="PLANT INPUT & DIGITAL TWIN" badge="MANUAL MODE"/>
           <div className="input-layout"><div className="form-grid">
             <Field label="Feedstock" value={inputs.feedstock} onChange={v=>update("feedstock",v)} options={["Dairy WW","Cow Manure","Food Waste","Brewery","Paper Mill","Mixed Waste"]}/>
             <Field label="Feed rate" value={inputs.feedRate} unit="kg VS/d" onChange={v=>update("feedRate",v)} min={820} max={870}/>
@@ -73,13 +76,13 @@ export default function Home(){
           <button className="predict" onClick={predict} disabled={loading}>{loading?<><span className="spinner"></span> Agent analyzing plant conditions…</>:<>✦ Run AI prediction</>}</button>
         </div>
 
-        <div className="card optimization"><Title title="AI OPTIMIZATION ENGINE" badge={result?"LIVE REPORT":"AWAITING INPUT"}/>
+        <div className="card optimization" id="ai-optimization"><Title title="AI OPTIMIZATION ENGINE" badge={result?"LIVE REPORT":"AWAITING INPUT"}/>
           {loading?<AgentSteps/>:result?<OptimizationReport result={result} benefitPoints={benefitPoints} onDetails={()=>setDetailsOpen(true)}/>:<div className="empty"><span>✦</span><b>Ready to optimize</b><p>Enter current plant conditions and run a prediction. Every report panel will refresh from the new scenario.</p></div>}
         </div>
       </section>
 
       <section className="lower-grid">
-        <div className="card forecast"><Title title="PREDICTION CENTER" badge="NEXT 24 HOURS"/><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Prediction forecast"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1677ff" stopOpacity=".28"/><stop offset="1" stopColor="#1677ff" stopOpacity="0"/></linearGradient></defs><polygon points={`0,95 ${points} 100,95`} fill="url(#area)"/><polyline points={points} fill="none" stroke="#1677ff" strokeWidth="2" vectorEffect="non-scaling-stroke"/></svg><div className="forecast-stats"><b>{shown.biogas.toFixed(1)}<small> m³/d<br/>Biogas</small></b><b>{shown.methanePct.toFixed(1)}<small>%<br/>CH₄</small></b><b>{shown.electricity.toFixed(1)}<small> kWh/d<br/>Electricity</small></b></div></div>
+        <div className="card forecast" id="prediction-center"><Title title="PREDICTION CENTER" badge="NEXT 24 HOURS"/><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Prediction forecast"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1677ff" stopOpacity=".28"/><stop offset="1" stopColor="#1677ff" stopOpacity="0"/></linearGradient></defs><polygon points={`0,95 ${points} 100,95`} fill="url(#area)"/><polyline points={points} fill="none" stroke="#1677ff" strokeWidth="2" vectorEffect="non-scaling-stroke"/></svg><div className="forecast-stats"><b>{shown.biogas.toFixed(1)}<small> m³/d<br/>Biogas</small></b><b>{shown.methanePct.toFixed(1)}<small>%<br/>CH₄</small></b><b>{shown.electricity.toFixed(1)}<small> kWh/d<br/>Electricity</small></b></div></div>
         <div className="card health"><Title title="PROCESS HEALTH" badge={`${shown.stability.toFixed(0)}% STABLE`}/><div className="gauges"><Gauge label="COD removal" value={shown.codRemoval}/><Gauge label="Gas stability" value={shown.stability}/><Gauge label="Input coverage" value={shown.confidence}/></div><div className="health-list"><span>Pressure <b>{shown.pressure.toFixed(1)} mbar</b></span><span>H₂S prediction <b>{shown.h2s.toFixed(0)} ppm</b></span><span>Data source <b>Human input</b></span></div></div>
         <div className="card history"><Title title="RECENT SIMULATIONS" badge={`${history.length} RUNS`}/>{history.length?history.map((h,i)=><div className="history-row" key={i}><span><i className="ok">✓</i>{h.time}</span><b>{h.biogas.toFixed(1)} m³/d</b><em>{h.electricity.toFixed(0)} kWh</em></div>):<div className="no-history">Your predictions will appear here.</div>}<div className="iot-note"><span>◉</span><div><b>IoT-ready architecture</b><small>Manual form can be replaced by live sensor ingestion without changing the prediction contract.</small></div></div></div>
       </section>
