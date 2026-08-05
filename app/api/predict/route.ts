@@ -122,7 +122,9 @@ export async function POST(req:Request) {
     {label:"Boiler Fuel Saving",value:methaneGain*.58},
     {label:"Carbon Reduction",value:electricityGain},
   ];
-  const overallBenefit = clamp(optimizationTargets.reduce((sum,target)=>sum+target.value,0)/optimizationTargets.length,-20,65);
+  // Keep the two headline figures identical: both represent the predicted
+  // biogas performance improvement versus the same baseline scenario.
+  const overallBenefit = improvement;
   const benefitTrend = Array.from({length:8},(_,index)=>overallBenefit*(.58+index*.055)+Math.sin(index*1.15)*Math.max(1,Math.abs(overallBenefit)*.045));
 
   const recommendations:{title:string;detail:string;impact:number;tone:string}[] = [];
