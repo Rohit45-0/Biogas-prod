@@ -204,7 +204,7 @@ export default function Home() {
 
     <section className="workspace" id="executive-overview">
       <header>
-        <div><h1>AI Command Center</h1><p>Smart Biogas Optimization & Digital Twin Platform</p></div>
+        <div className="header-intro"><h1>AI Command Center</h1><p>Smart Biogas Optimization & Digital Twin Platform</p></div>
         <div className="header-actions">
           <span className={`online ${healthError?"degraded":""}`}>● &nbsp; {healthError?"Health unavailable":health?"System Online":"Checking system"}</span>
           <span className="date">▣ &nbsp; {now.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} · {now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>
@@ -216,10 +216,10 @@ export default function Home() {
       <div className="simulation-banner"><span>SIMULATION MODE</span><p>Human-entered inputs drive a deterministic prototype model. Equipment commands and gas sensors are simulated until physical IoT devices are connected.</p>{dirty&&<b>Inputs changed · run prediction to refresh every report</b>}</div>
 
       <section className="kpis">
-        <Kpi label="Prototype Readiness" value={health?`${health.readiness}%`:"—"} color="#1e87f0" note={health?`${health.readyChecks}/${health.totalChecks} systems ready`:"Checking services"}/>
-        <Kpi label="Scenario Coverage" value={result?`${result.confidence.toFixed(0)}%`:"—"} color="#6d28d9" note={result?"Input-space validity, not accuracy":"Awaiting prediction"}/>
-        <Kpi label="Digital Twin" value={loading?"RUN":result?"ACTIVE":"READY"} color="#18a957" note={loading?"Agent evaluating scenario":result?`Run ${shortId(result.runId)}`:"Manual input mode"}/>
-        <Kpi label="Optimization Gain" value={result?`${signed(result.improvement)}%`:"—"} color="#f97316" note={result?"Biogas vs same modeled baseline":"Awaiting prediction"}/>
+        <Kpi label="Prototype Readiness" value={health?`${health.readiness}%`:"—"} percent={health?.readiness??0} color="#1e87f0" note={health?`${health.readyChecks}/${health.totalChecks} systems ready`:"Checking services"}/>
+        <Kpi label="Scenario Coverage" value={result?`${result.confidence.toFixed(0)}%`:"—"} percent={result?.confidence??0} color="#6d28d9" note={result?"Input-space validity, not model accuracy":"Awaiting prediction"}/>
+        <Kpi label="Digital Twin" value={loading?"RUN":result?"ACTIVE":"READY"} percent={loading?68:result?100:24} color="#18a957" note={loading?"Agent evaluating scenario":result?`Run ${shortId(result.runId)}`:"Manual input mode"}/>
+        <Kpi label="Optimization Gain" value={result?`${signed(result.improvement)}%`:"—"} percent={result?Math.min(100,Math.max(12,result.improvement*4)):0} color="#f97316" note={result?"Biogas vs same modeled baseline":"Awaiting prediction"}/>
       </section>
 
       <section className="main-grid">
@@ -392,7 +392,7 @@ function AdminModal({auth,health,settings,busy,message,onSettings,onSave,onRefre
 
 function Title({title,badge}:{title:string;badge:string}) {return <div className="card-title"><h2>{title}</h2><span>{badge}</span></div>}
 function AwaitingPrediction({text}:{text:string}) {return <div className="awaiting"><span>◇</span><b>No static result values</b><p>{text}</p></div>}
-function Kpi({label,value,color,note}:{label:string;value:string;color:string;note:string}) {return <div className="kpi card"><div className={`ring ${value.length>5?"wide-value":""}`} style={{"--color":color} as React.CSSProperties}><b>{value}</b></div><div><span>{label}</span><small>{note}</small><i style={{background:color}}></i></div></div>}
+function Kpi({label,value,percent,color,note}:{label:string;value:string;percent:number;color:string;note:string}) {return <div className="kpi card"><div className={`ring ${value.length>5?"wide-value":""}`} style={{"--color":color,"--percent":Math.min(100,Math.max(0,percent))} as React.CSSProperties}><b>{value}</b></div><div><span>{label}</span><small>{note}</small><i style={{background:color}}></i></div></div>}
 function Field({label,value,unit,onChange,options,step,min,max}:{label:string;value:string|number;unit?:string;onChange:(value:string)=>void;options?:string[];step?:string;min?:number;max?:number}) {return <label className="field"><span>{label}</span><div>{options?<select value={value} onChange={event=>onChange(event.target.value)}>{options.map(option=><option key={option}>{option}</option>)}</select>:<input type="number" step={step||"1"} min={min} max={max} value={value} onChange={event=>onChange(event.target.value)}/>} {unit&&<em>{unit}</em>}</div></label>}
 function Metric({label,value,delta}:{label:string;value:string;delta:string}) {return <div className="metric"><span>{label}</span><b>{value}</b><small>{delta} ↗</small></div>}
 function Gauge({label,value}:{label:string;value:number}) {return <div><div className="gauge" style={{"--p":`${Math.max(0,Math.min(100,value))*3.6}deg`} as React.CSSProperties}><b>{value.toFixed(0)}%</b></div><span>{label}</span></div>}
