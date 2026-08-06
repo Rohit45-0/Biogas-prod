@@ -3,7 +3,7 @@ import { retrieveKnowledge } from "../../lib/rag";
 import { getSession } from "../../lib/auth";
 
 type Inputs = { feedstock?:string; feedRate?: number; temperature?: number; ph?: number; olr?: number; hrt?: number; codIn?:number; vfa?:number; mixing?:number };
-type Prediction = { biogas?: number; methanePct?: number; electricity?: number; carbon?: number; modelName?:string; confidence?:number; bestSetpoints?: { feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number } };
+type Prediction = { biogas?: number; methanePct?: number; electricity?: number; carbon?: number; modelName?:string; confidence?:number; runId?:string; alerts?:{label:string;status:string;message:string;value:number;unit:string;limit:string}[]; recommendations?:{title:string;detail:string}[]; bestSetpoints?: { feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number } };
 type Message = { role?: string; text?: string };
 
 function fallbackAnswer(question: string, inputs: Inputs, prediction: Prediction | null) {
@@ -21,6 +21,12 @@ function fallbackAnswer(question: string, inputs: Inputs, prediction: Prediction
   }
   if (q.includes("methane") || q.includes("electricity") || q.includes("biogas")) {
     return `${outputs} Biogas, methane percentage, and generator power come from the multi-input scenario inference; daily electricity is predicted generator kW multiplied by 24 hours. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixing all influence the result.`;
+  }
+  if (q.includes("alert") || q.includes("alarm") || q.includes("limit") || q.includes("attention")) {
+    const active = prediction?.alerts?.filter((alert) => alert.status !== "normal") ?? [];
+    if (!prediction) return "Run a prediction first so I can evaluate the current gas thresholds.";
+    if (!active.length) return `No configured gas threshold is active for this simulation. ${outputs} These are model-derived checks, not physical leakage alarms.`;
+    return `${active.map((alert) => `${alert.label}: ${alert.value.toFixed(1)} ${alert.unit} (${alert.message}; configured ${alert.limit})`).join(" ")} Review these simulated alerts with the operator; no equipment command has been sent.`;
   }
   if (q.includes("model") || q.includes("random") || q.includes("prediction")) {
     return `This dashboard uses a deterministic multi-input, distance-weighted scenario model, not random numbers. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixing are all considered. It is anchored to the supplied optimization cases and uses the synthetic SCADA ranges for coverage, so it remains a prototype rather than a live-plant validated model. ${outputs}`;
@@ -42,7 +48,7 @@ async function generateAnswer(question: string, inputs: Inputs, prediction: Pred
   if (!apiKey) return null;
 
   const plantState = prediction?.biogas !== undefined
-    ? `Current prediction: ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methanePct?.toFixed(1)}% CH4, ${prediction.electricity?.toFixed(1)} kWh/day, ${prediction.carbon?.toFixed(2)} tCO2e/day.`
+    ? `Current prediction: ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methanePct?.toFixed(1)}% CH4, ${prediction.electricity?.toFixed(1)} kWh/day, ${prediction.carbon?.toFixed(2)} tCO2e/day. Run ID: ${prediction.runId ?? "not available"}. Active simulated alerts: ${(prediction.alerts ?? []).filter((alert) => alert.status !== "normal").map((alert) => `${alert.label} ${alert.value} ${alert.unit}`).join(", ") || "none"}. Current operator recommendations: ${(prediction.recommendations ?? []).map((item) => item.title).join("; ") || "none"}.`
     : "No prediction has been run in this chat yet.";
   const currentInputs = `Current inputs: feedstock ${inputs.feedstock ?? "n/a"}, feed rate ${inputs.feedRate ?? "n/a"} kg VS/day, temperature ${inputs.temperature ?? "n/a"} C, pH ${inputs.ph ?? "n/a"}, OLR ${inputs.olr ?? "n/a"} kg COD/m3/day, HRT ${inputs.hrt ?? "n/a"} days, COD ${inputs.codIn ?? "n/a"} mg/L, VFA ${inputs.vfa ?? "n/a"} mg/L, mixing ${inputs.mixing ?? "n/a"} RPM.`;
   const recentChat = history.slice(-6).map((message) => `${message.role === "user" ? "User" : "Copilot"}: ${String(message.text ?? "").slice(0, 500)}`).join("\n");
