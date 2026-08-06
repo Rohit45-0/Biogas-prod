@@ -7,8 +7,17 @@ type PlantOutput = { gasFlow:number; biogas:number; methanePct:number; methane:n
 type Recommendation = { title:string; detail:string; impact:number; tone:string; parameter:string; current:number; target:number; unit:string };
 type Alert = { key:string; label:string; value:number; unit:string; limit:string; status:"normal"|"warning"|"critical"; message:string };
 type Equipment = { label:string; state:string; detail:string; mode:string; tone:string };
-type HourPoint = { hour:number; biogas:number; electricity:number; ch4:number; co2:number; h2s:number };
+type HourPoint = { hour:number; biogas:number; electricity:number; baselineBiogas:number; baselineElectricity:number; ch4:number; co2:number; h2s:number };
 type GasMetric = { key:string; label:string; name:string; before:number; after:number; unit:string; direction:string };
+type ModelTrace = {
+  executionId:string; executedAt:string; endpoint:string; algorithm:string; implementation:string; randomized:boolean;
+  inputCount:number; scenarioCount:number; coverageRows:number; status:string;
+  stages:{label:string;status:string;detail:string}[];
+  nearestScenarios:{anchor:string;feedstock:string;distance:number;weight:number}[];
+  featureInfluence:{label:string;contribution:number;interpretation:string}[];
+  previousComparison:{available:boolean;biogasBefore:number|null;biogasAfter:number;delta:number|null};
+  limitations:readonly string[];
+};
 type Prediction = {
   biogas:number; methanePct:number; methane:number; electricity:number; carbon:number; codRemoval:number; stability:number;
   confidence:number; improvement:number; pressure:number; h2s:number; generatorKw:number; overallBenefit:number; benefitTrend:number[];
@@ -16,6 +25,7 @@ type Prediction = {
   bestSetpoints:Omit<Inputs,"feedstock">; agentMessage:string; modelName:string; modelVersion:string; modelFit:string; outOfRange:boolean;
   confidenceMeaning:string; baseline:PlantOutput; optimized:PlantOutput; gasComposition:GasMetric[]; performanceMetrics:GasMetric[]; alerts:Alert[]; equipmentStates:Equipment[];
   inputEffects:{label:string;value:string;effect:string}[]; facility:{name:string;location:string}; mode:string; runId:string; createdAt:string;
+  modelTrace:ModelTrace;
   audit:{runId:string;createdAt:string;saved:boolean;status:string};
 };
 type AuthUser = { username:string; role:"admin"|"user" };
@@ -29,12 +39,18 @@ type AuditRun = { id:string; created_at:number; username:string; feedstock:strin
 type AdminSettings = { methaneMinimum:number; h2sWarning:number; pressureMinimum:number; pressureMaximum:number; facilityName:string; facilityLocation:string };
 
 const initial: Inputs = { feedstock:"Dairy WW", feedRate:846, temperature:35, ph:7.1, olr:3.5, hrt:22, codIn:7000, vfa:1100, mixing:50 };
+const inputBounds:Record<Exclude<keyof Inputs,"feedstock">,{min:number;max:number;label:string}> = {
+  feedRate:{min:820,max:870,label:"Feed rate"}, temperature:{min:34.08,max:38.87,label:"Temperature"},
+  ph:{min:6.82,max:7.58,label:"pH"}, olr:{min:1.55,max:6.38,label:"Organic loading"},
+  hrt:{min:15.45,max:34.62,label:"Retention time"}, codIn:{min:3205,max:11864,label:"COD input"},
+  vfa:{min:251,max:2963,label:"VFA"}, mixing:{min:20,max:79,label:"Mixer speed"},
+};
 const nav = ["Executive Overview","AI Intelligence","Digital Twin","IoT & Sensors","AI Optimization","Prediction Center","Explainable AI","Data & Audit","Settings"];
 const navIcons = ["⌂","✦","♙","◉","✥","◇","◎","▦","⚙"];
 const navTargets:Record<string,string> = {
-  "Executive Overview":"executive-overview", "AI Intelligence":"ai-optimization", "Digital Twin":"digital-twin",
+  "Executive Overview":"executive-overview", "AI Intelligence":"model-proof", "Digital Twin":"digital-twin",
   "IoT & Sensors":"iot-sensors", "AI Optimization":"ai-optimization", "Prediction Center":"prediction-center",
-  "Explainable AI":"explainable-ai", "Data & Audit":"data-audit",
+  "Explainable AI":"model-proof", "Data & Audit":"data-audit",
 };
 const quickQuestions = ["What are the best setpoints?","Explain this prediction","Which alert needs attention?"];
 
@@ -70,6 +86,11 @@ export default function Home() {
   const autoRun = useRef(false);
 
   const dirty = Boolean(lastRunInputs && JSON.stringify(lastRunInputs) !== JSON.stringify(inputs));
+  const validationIssues = useMemo(()=>Object.entries(inputBounds).flatMap(([key,bound])=>{
+    const value=inputs[key as keyof typeof inputBounds];
+    return !Number.isFinite(value)||value<bound.min||value>bound.max?[`${bound.label}: supported ${bound.min}–${bound.max}`]:[];
+  }),[inputs]);
+  const changedInputCount = useMemo(()=>lastRunInputs?Object.keys(inputs).filter(key=>inputs[key as keyof Inputs]!==lastRunInputs[key as keyof Inputs]).length:0,[inputs,lastRunInputs]);
 
   const refreshHealth = async() => {
     try {
@@ -119,6 +140,19 @@ export default function Home() {
     return()=>window.clearInterval(monitor);
   },[auth]);
 
+  useEffect(()=>{
+    if(!auth)return;
+    const sectionNames=Object.entries(navTargets);
+    const observer=new IntersectionObserver(entries=>{
+      const visible=entries.filter(entry=>entry.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
+      if(!visible)return;
+      const match=sectionNames.find(([,id])=>id===visible.target.id);
+      if(match)setActive(match[0]);
+    },{rootMargin:"-20% 0px -65% 0px",threshold:[.05,.3]});
+    [...new Set(Object.values(navTargets))].forEach(id=>{const element=document.getElementById(id);if(element)observer.observe(element);});
+    return()=>observer.disconnect();
+  },[auth]);
+
   const login = async(event:FormEvent) => {
     event.preventDefault(); setLoginBusy(true); setLoginError("");
     try {
@@ -156,6 +190,15 @@ export default function Home() {
     if(!result)return;
     setInputs(current=>({...current,...result.bestSetpoints}));
     setMessages(current=>[...current,{role:"ai",text:"I copied the modeled setpoints into the input form. They are not applied to equipment. Run a new prediction to compare the proposed scenario."}]);
+  };
+
+  const loadTestScenario = () => setInputs({feedstock:"Food Waste",feedRate:868,temperature:36.8,ph:7.2,olr:3.7,hrt:19,codIn:9800,vfa:1280,mixing:58});
+  const resetInputs = () => setInputs(initial);
+  const downloadEvidence = () => {
+    if(!result||!lastRunInputs)return;
+    const documentData={title:"Aquaivolt prediction evidence",exportedAt:new Date().toISOString(),inputs:lastRunInputs,prediction:result};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(documentData,null,2)],{type:"application/json"}));
+    const link=document.createElement("a");link.href=url;link.download=`aquaivolt-${shortId(result.runId)}-evidence.json`;link.click();URL.revokeObjectURL(url);
   };
 
   const ask = async(event?:FormEvent,quick?:string) => {
@@ -213,7 +256,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="simulation-banner"><span>SIMULATION MODE</span><p>Human-entered inputs drive a deterministic prototype model. Equipment commands and gas sensors are simulated until physical IoT devices are connected.</p>{dirty&&<b>Inputs changed · run prediction to refresh every report</b>}</div>
+      <div className="simulation-banner"><span>SIMULATION MODE</span><p>Human-entered inputs drive a deterministic prototype model. Equipment commands and gas sensors are simulated until physical IoT devices are connected.</p>{dirty&&<b>{changedInputCount} input{changedInputCount===1?"":"s"} changed · run prediction to refresh every report</b>}</div>
 
       <section className="kpis">
         <Kpi label="Prototype Readiness" value={health?`${health.readiness}%`:"—"} percent={health?.readiness??0} color="#1e87f0" note={health?`${health.readyChecks}/${health.totalChecks} systems ready`:"Checking services"}/>
@@ -225,6 +268,7 @@ export default function Home() {
       <section className="main-grid">
         <div className="card input-card" id="digital-twin">
           <Title title="PLANT INPUT & DIGITAL TWIN" badge="MANUAL INPUT"/>
+          <div className="input-toolbar"><div><b>All nine fields are editable</b><small>Supported ranges are guidance. Out-of-range values are accepted for testing and transparently clipped by the prototype model.</small></div><span><button type="button" onClick={loadTestScenario}>Load comparison example</button><button type="button" onClick={resetInputs}>Reset</button></span></div>
           <div className="input-layout">
             <div className="form-grid">
               <Field label="Feedstock" value={inputs.feedstock} onChange={value=>update("feedstock",value)} options={["Dairy WW","Cow Manure","Food Waste","Brewery","Paper Mill","Mixed Waste"]}/>
@@ -239,7 +283,8 @@ export default function Home() {
             </div>
             <DigitalTwin working={loading} result={result}/>
           </div>
-          <button className="predict" onClick={()=>void predict()} disabled={loading}>{loading?<><span className="spinner"></span> Optimization agent is analyzing…</>:<>✦ Run AI prediction</>}</button>
+          {validationIssues.length>0&&<div className="range-warning"><b>Outside supported model coverage</b><span>{validationIssues.join(" · ")}</span><small>The run is still allowed for testing; the backend will clip these values and lower scenario coverage.</small></div>}
+          <button className="predict" onClick={()=>void predict()} disabled={loading}>{loading?<><span className="spinner"></span> Optimization agent is analyzing…</>:<>✦ Run AI prediction and refresh every report</>}</button>
           {predictionError&&<p className="inline-error">{predictionError}</p>}
         </div>
 
@@ -254,10 +299,15 @@ export default function Home() {
         {result&&lastRunInputs?<EvidenceTable result={result} inputs={lastRunInputs}/>:<AwaitingPrediction text="The auditable before/after table will appear after prediction."/>}
       </section>
 
+      <section className="card model-proof" id="model-proof">
+        <Title title="MODEL EXECUTION & TRANSPARENCY" badge={result?`VERIFIED RUN ${shortId(result.runId)}`:"AWAITING MODEL"}/>
+        {result?<ModelTransparency result={result} onDownload={downloadEvidence}/>:<AwaitingPrediction text="Run a prediction to display the server endpoint, algorithm stages, feature-distance evidence, matched scenarios and execution record."/>}
+      </section>
+
       <section className="monitoring-grid" id="prediction-center">
         <div className="card trend-card">
           <Title title="24-HOUR YIELD & ENERGY TREND" badge={result?"MODEL-DERIVED":"AWAITING MODEL"}/>
-          {result?<YieldEnergyChart data={result.hourlyForecast}/>:<AwaitingPrediction text="Biogas yield and electricity forecasts will appear here."/>}
+          {result&&lastRunInputs?<YieldEnergyChart result={result} inputs={lastRunInputs}/>:<AwaitingPrediction text="Biogas yield and electricity forecasts will appear here."/>}
         </div>
         <div className="card digester-card">
           <Title title="DIGESTER HEALTH" badge={result?statusFromStability(result.stability):"AWAITING MODEL"}/>
@@ -275,8 +325,8 @@ export default function Home() {
           <FacilityMap result={result}/>
         </div>
         <div className="card device-card">
-          <Title title="DEVICE & SENSOR STATUS" badge="PRE-INTEGRATION"/>
-          <DeviceStatus result={result}/>
+          <Title title="SENSOR CONFIGURATION" badge="MANUAL → IOT READY"/>
+          <SensorConfiguration result={result} inputs={inputs}/>
         </div>
         <div className="card alerts-card">
           <Title title="GAS LIMITS & ALERTS" badge={result?`${result.alerts.filter(alert=>alert.status!=="normal").length} ACTIVE`:"AWAITING MODEL"}/>
@@ -338,22 +388,29 @@ function OptimizationReport({result,benefitPoints,onDetails}:{result:Prediction;
 }
 
 function EvidenceTable({result,inputs}:{result:Prediction;inputs:Inputs}) {
-  const rows=[
-    {label:"Temperature",before:inputs.temperature,after:result.bestSetpoints.temperature,unit:"°C",desired:"target"},
-    {label:"pH",before:inputs.ph,after:result.bestSetpoints.ph,unit:"",desired:"target"},
-    {label:"OLR",before:inputs.olr,after:result.bestSetpoints.olr,unit:"kg COD/m³·d",desired:"target"},
-    {label:"HRT",before:inputs.hrt,after:result.bestSetpoints.hrt,unit:"days",desired:"target"},
-    {label:"COD input",before:inputs.codIn,after:result.bestSetpoints.codIn,unit:"mg/L",desired:"reference"},
-    {label:"CH₄ content",before:result.baseline.methanePct,after:result.optimized.methanePct,unit:"%",desired:"up"},
-    {label:"Gas flow",before:result.baseline.gasFlow,after:result.optimized.gasFlow,unit:"m³/h",desired:"up"},
-    {label:"Generator",before:result.baseline.generatorKw,after:result.optimized.generatorKw,unit:"kW",desired:"up"},
+  const setpointRows=[
+    {group:"Setpoint",label:"Temperature",before:inputs.temperature,after:result.bestSetpoints.temperature,unit:"°C",direction:"target"},
+    {group:"Setpoint",label:"pH",before:inputs.ph,after:result.bestSetpoints.ph,unit:"",direction:"target"},
+    {group:"Setpoint",label:"OLR",before:inputs.olr,after:result.bestSetpoints.olr,unit:"kg COD/m³·d",direction:"target"},
+    {group:"Setpoint",label:"HRT",before:inputs.hrt,after:result.bestSetpoints.hrt,unit:"days",direction:"target"},
   ];
-  return <div className="evidence-table"><div className="evidence-row evidence-head"><span>Parameter</span><span>Current / Baseline</span><span>AI Scenario</span><span>Change</span><span>Evidence bar</span></div>{rows.map(row=>{const delta=row.after-row.before;const pct=row.before?delta/row.before*100:0;const width=Math.min(100,Math.max(8,50+pct*2));return <div className="evidence-row" key={row.label}><b>{row.label}</b><span>{format(row.before)} {row.unit}</span><span className="scenario-value">{format(row.after)} {row.unit}</span><span className={row.desired==="up"?(delta>=0?"positive":"negative"):"neutral"}>{row.desired==="up"?`${signed(pct)}%`:delta===0?"Hold":`${delta>0?"+":""}${format(delta)}`}</span><span className="data-bar"><i style={{width:`${width}%`}}></i></span></div>})}<div className="evidence-footer"><span>AI recommendation</span><b>{result.recommendations[0]?.title}</b><small>{result.recommendations[0]?.detail}</small></div></div>;
+  const outputRows=result.performanceMetrics.map(metric=>({group:"Output",label:metric.name,before:metric.before,after:metric.after,unit:metric.unit,direction:metric.direction}));
+  const rows=[...setpointRows,...outputRows];
+  return <div className="evidence-table"><div className="evidence-row evidence-head"><span>Metric</span><span>Current / Baseline</span><span>AI Scenario</span><span>Measured change</span><span>Numeric evidence</span></div>{rows.map(row=>{const delta=row.after-row.before;const pct=row.before?delta/row.before*100:0;const max=Math.max(Math.abs(row.before),Math.abs(row.after),1)*1.08;const beforeWidth=Math.max(8,Math.abs(row.before)/max*100);const afterWidth=Math.max(8,Math.abs(row.after)/max*100);const good=row.direction==="up"?delta>=0:row.direction==="down"?delta<=0:true;return <div className="evidence-row" key={`${row.group}-${row.label}`}><b><small>{row.group}</small>{row.label}</b><span>{format(row.before)} {row.unit}</span><span className="scenario-value">{format(row.after)} {row.unit}</span><span className={row.direction==="target"?"neutral":good?"positive":"negative"}>{row.direction==="target"?(delta===0?"Hold":`${delta>0?"+":""}${format(delta)} ${row.unit}`):<>{good?"▲":"▼"} {signed(pct)}%</>}</span><div className="evidence-bars"><span><i style={{width:`${beforeWidth}%`}}></i><em>B {format(row.before)}</em></span><span className="ai-evidence"><i style={{width:`${afterWidth}%`}}></i><em>AI {format(row.after)}</em></span></div></div>})}<div className="evidence-footer"><span>AI recommendation</span><b>{result.recommendations[0]?.title}</b><small>{result.recommendations[0]?.detail}</small></div></div>;
 }
 
-function YieldEnergyChart({data}:{data:HourPoint[]}) {
-  const gas=data.map(point=>point.biogas), energy=data.map(point=>point.electricity);
-  return <div className="dual-chart"><div className="chart-legend"><span><i className="gas-line"></i>Biogas yield (m³/day)</span><span><i className="energy-line"></i>Electricity (kWh/day)</span></div><div className="chart-wrap"><span className="axis left">{Math.max(...gas).toFixed(0)}<small>{Math.min(...gas).toFixed(0)}</small></span><svg viewBox="0 0 100 58" preserveAspectRatio="none"><defs><linearGradient id="gasFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#24bea5" stopOpacity=".28"/><stop offset="1" stopColor="#24bea5" stopOpacity="0"/></linearGradient></defs><g className="grid-lines"><line x1="0" y1="8" x2="100" y2="8"/><line x1="0" y1="29" x2="100" y2="29"/><line x1="0" y1="50" x2="100" y2="50"/></g><polygon points={`0,52 ${linePoints(gas,100,58,8)} 100,52`} fill="url(#gasFill)"/><polyline points={linePoints(gas,100,58,8)} fill="none" stroke="#21bca3" strokeWidth="2" vectorEffect="non-scaling-stroke"/><polyline points={linePoints(energy,100,58,8)} fill="none" stroke="#e7b74a" strokeWidth="2" vectorEffect="non-scaling-stroke"/></svg><span className="axis right">{Math.max(...energy).toFixed(0)}<small>{Math.min(...energy).toFixed(0)}</small></span></div><div className="chart-hours">{data.filter((_,index)=>index%2===0).map(point=><span key={point.hour}>{point.hour}:00</span>)}</div></div>;
+function ModelTransparency({result,onDownload}:{result:Prediction;onDownload:()=>void}) {
+  const trace=result.modelTrace;
+  return <div className="model-transparency"><div className="execution-proof"><span><i></i>SERVER EXECUTION COMPLETE</span><b>{trace.endpoint}</b><em>{new Date(trace.executedAt).toLocaleString()}</em><code>{trace.executionId}</code></div><div className="model-proof-grid"><section><h3>Execution pipeline</h3><div className="execution-stages">{trace.stages.map((stage,index)=><div key={stage.label}><span>{index+1}</span><p><b>{stage.label}</b><small>{stage.detail}</small></p><em>✓ {stage.status}</em></div>)}</div></section><section><h3>Model card</h3><div className="model-facts"><span>Algorithm<b>{trace.algorithm}</b></span><span>Implementation<b>{trace.implementation}</b></span><span>Inputs / anchors / coverage<b>{trace.inputCount} / {trace.scenarioCount} / {trace.coverageRows.toLocaleString()} rows</b></span><span>Random output generation<b>{trace.randomized?"Enabled":"No — deterministic"}</b></span><span>Validation status<b>{trace.status}</b></span></div><h3>Closest supplied scenarios</h3><div className="scenario-matches">{trace.nearestScenarios.map(item=><div key={item.anchor}><b>{item.anchor}</b><span>{item.feedstock}</span><i><em style={{width:`${Math.max(3,item.weight)}%`}}></em></i><small>{item.weight.toFixed(1)}% weight</small></div>)}</div></section><section><h3>Input-distance evidence</h3><p className="proof-note">This explains which inputs moved the scenario away from its closest reference. It is not causal feature importance.</p><div className="feature-influence">{trace.featureInfluence.map(item=><div key={item.label}><span>{item.label}<small>{item.interpretation}</small></span><i><em style={{width:`${Math.max(2,item.contribution)}%`}}></em></i><b>{item.contribution.toFixed(1)}%</b></div>)}</div></section></div><div className="proof-footer"><p><b>Audit statement:</b> This is a synthetic-data prototype. It proves repeatable model execution and traceability, not real-plant prediction accuracy.</p><div><a href="/api/model" target="_blank" rel="noreferrer">Open backend model card</a><button onClick={onDownload}>Download run evidence</button></div></div></div>;
+}
+
+function YieldEnergyChart({result,inputs}:{result:Prediction;inputs:Inputs}) {
+  const data=result.hourlyForecast, gas=data.map(point=>point.biogas), baselineGas=data.map(point=>point.baselineBiogas), energy=data.map(point=>point.electricity), baselineEnergy=data.map(point=>point.baselineElectricity);
+  const gasDomain=[...gas,...baselineGas],energyDomain=[...energy,...baselineEnergy];
+  const gasDelta=(result.biogas/result.baseline.biogas-1)*100,energyDelta=(result.electricity/result.baseline.electricity-1)*100;
+  const previousDelta=result.modelTrace.previousComparison.delta;
+  const previousText=result.modelTrace.previousComparison.available&&previousDelta!==null?`${previousDelta>=0?"+":""}${previousDelta.toFixed(1)} m³/d`:"First run";
+  return <div className="dual-chart chart-refresh" key={result.runId}><div className="chart-update"><span><i></i>Updated from run {shortId(result.runId)}</span><b>{inputs.feedstock} · pH {inputs.ph} · {inputs.temperature} °C</b><em>{new Date(result.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</em></div><div className="chart-gains"><span>Biogas <b>{signed(gasDelta)}%</b></span><span>Electricity <b>{signed(energyDelta)}%</b></span><span>Previous run <b>{previousText}</b></span></div><div className="chart-legend"><span><i className="baseline-line"></i>Baseline biogas</span><span><i className="gas-line"></i>AI biogas</span><span><i className="baseline-energy-line"></i>Baseline energy</span><span><i className="energy-line"></i>AI energy</span></div><div className="chart-wrap"><span className="axis left">{Math.max(...gasDomain).toFixed(0)}<small>{Math.min(...gasDomain).toFixed(0)}</small></span><svg viewBox="0 0 100 58" preserveAspectRatio="none"><g className="grid-lines"><line x1="0" y1="8" x2="100" y2="8"/><line x1="0" y1="29" x2="100" y2="29"/><line x1="0" y1="50" x2="100" y2="50"/></g><polyline points={linePointsDomain(baselineGas,gasDomain,100,58,8)} fill="none" stroke="#9aa9ba" strokeWidth="1.3" strokeDasharray="4 3" vectorEffect="non-scaling-stroke"/><polyline points={linePointsDomain(gas,gasDomain,100,58,8)} fill="none" stroke="#13ae8d" strokeWidth="2.3" vectorEffect="non-scaling-stroke"/><polyline points={linePointsDomain(baselineEnergy,energyDomain,100,58,8)} fill="none" stroke="#c5a86a" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke"/><polyline points={linePointsDomain(energy,energyDomain,100,58,8)} fill="none" stroke="#e3a92f" strokeWidth="2" vectorEffect="non-scaling-stroke"/></svg><span className="axis right">{Math.max(...energyDomain).toFixed(0)}<small>{Math.min(...energyDomain).toFixed(0)}</small></span></div><div className="chart-hours">{data.filter((_,index)=>index%2===0).map(point=><span key={point.hour}>{point.hour}:00</span>)}</div></div>;
 }
 
 function DigesterHealth({result}:{result:Prediction}) {
@@ -368,9 +425,19 @@ function FacilityMap({result}:{result:Prediction|null}) {
   return <div className="facility-monitor"><div className="facility-map"><div className="map-road r1"></div><div className="map-road r2"></div><div className="map-road r3"></div><div className="plant-pin"><i></i><span>{result?.facility.name??"Aquaivolt plant"}<small>{result?.facility.location??"Location pending"}</small></span></div><b>FACILITY POSITION</b><small>Admin-configured coordinates will replace this simulation canvas.</small></div><div className="facility-stats"><div><span>Device availability</span><b>0 / 5 live</b><small>Hardware not connected</small></div><div><span>Simulated signals</span><b>{result?"9 inputs · 3 gases":"Awaiting run"}</b><small>Model data contract active</small></div><div><span>Alarm scenes</span><b>{result?result.alerts.filter(alert=>alert.status!=="normal").length:"—"}</b><small>Threshold-based simulation</small></div></div></div>;
 }
 
-function DeviceStatus({result}:{result:Prediction|null}) {
-  const devices=[{name:"Gas analyzer · 3-in-1",signal:"CH₄ / CO₂ / H₂S"},{name:"Digester probe",signal:"Temperature / pH"},{name:"Flow transmitter",signal:"Gas flow / pressure"},{name:"Generator meter",signal:"kW / kWh"},{name:"PLC gateway",signal:"Valves / mixer / heating"}];
-  return <div className="device-list">{devices.map(device=><div key={device.name}><span className="device-dot"></span><b>{device.name}<small>{device.signal}</small></b><em>NOT CONNECTED</em></div>)}<p><i></i>{result?`Simulation run ${shortId(result.runId)} is supplying the dashboard.`:"The model will supply simulated signals until device credentials are configured."}</p></div>;
+function SensorConfiguration({result,inputs}:{result:Prediction|null;inputs:Inputs}) {
+  const sensors=[
+    {tag:"FEED-001",name:"Feed rate",value:`${inputs.feedRate} kg VS/d`,range:"820–870",source:"Manual"},
+    {tag:"TEMP-001",name:"Temperature",value:`${inputs.temperature} °C`,range:"34.08–38.87",source:"Manual"},
+    {tag:"PH-001",name:"pH probe",value:`${inputs.ph} pH`,range:"6.82–7.58",source:"Manual"},
+    {tag:"OLR-CALC",name:"Organic loading",value:`${inputs.olr} kg COD/m³·d`,range:"1.55–6.38",source:"Calculated"},
+    {tag:"HRT-CALC",name:"Retention time",value:`${inputs.hrt} days`,range:"15.45–34.62",source:"Calculated"},
+    {tag:"COD-001",name:"COD input",value:`${inputs.codIn} mg/L`,range:"3,205–11,864",source:"Manual"},
+    {tag:"VFA-001",name:"VFA",value:`${inputs.vfa} mg/L`,range:"251–2,963",source:"Manual"},
+    {tag:"MIX-001",name:"Mixer speed",value:`${inputs.mixing} RPM`,range:"20–79",source:"Manual"},
+    {tag:"GAS-001",name:"Gas analyzer",value:result?`${result.methanePct.toFixed(1)}% CH₄ · ${result.h2s.toFixed(0)} ppm H₂S`:"Awaiting prediction",range:"CH₄ / CO₂ / H₂S",source:"Simulated"},
+  ];
+  return <div className="sensor-config"><div className="sensor-flow"><b>Current data path</b><span>Manual form</span><i>→</i><span>POST /api/predict</span><i>→</i><span>Model v{result?.modelVersion??"1.4.0"}</span></div><div className="sensor-head"><span>Tag / mapping</span><span>Current value</span><span>Configured range</span><span>Mode</span></div><div className="sensor-rows">{sensors.map(sensor=><div key={sensor.tag}><b>{sensor.tag}<small>{sensor.name}</small></b><span>{sensor.value}</span><span>{sensor.range}</span><em>{sensor.source}<small>IoT not connected</small></em></div>)}</div><p><i></i>These tag mappings are the proposed IoT contract. They currently read manual or simulated data and send no commands to physical equipment.</p></div>;
 }
 
 function AlertList({alerts}:{alerts:Alert[]}) {return <div className="alert-list">{alerts.map(alert=><div className={`alert-row ${alert.status}`} key={alert.key}><span>{alert.status==="normal"?"✓":alert.status==="critical"?"!":"△"}</span><div><b>{alert.label}</b><small>{alert.message}</small></div><em>{format(alert.value)} {alert.unit}<small>Limit {alert.limit}</small></em></div>)}</div>}
@@ -393,7 +460,7 @@ function AdminModal({auth,health,settings,busy,message,onSettings,onSave,onRefre
 function Title({title,badge}:{title:string;badge:string}) {return <div className="card-title"><h2>{title}</h2><span>{badge}</span></div>}
 function AwaitingPrediction({text}:{text:string}) {return <div className="awaiting"><span>◇</span><b>No static result values</b><p>{text}</p></div>}
 function Kpi({label,value,percent,color,note}:{label:string;value:string;percent:number;color:string;note:string}) {return <div className="kpi card"><div className={`ring ${value.length>5?"wide-value":""}`} style={{"--color":color,"--percent":Math.min(100,Math.max(0,percent))} as React.CSSProperties}><b>{value}</b></div><div><span>{label}</span><small>{note}</small><i style={{background:color}}></i></div></div>}
-function Field({label,value,unit,onChange,options,step,min,max}:{label:string;value:string|number;unit?:string;onChange:(value:string)=>void;options?:string[];step?:string;min?:number;max?:number}) {return <label className="field"><span>{label}</span><div>{options?<select value={value} onChange={event=>onChange(event.target.value)}>{options.map(option=><option key={option}>{option}</option>)}</select>:<input type="number" step={step||"1"} min={min} max={max} value={value} onChange={event=>onChange(event.target.value)}/>} {unit&&<em>{unit}</em>}</div></label>}
+function Field({label,value,unit,onChange,options,step,min,max}:{label:string;value:string|number;unit?:string;onChange:(value:string)=>void;options?:string[];step?:string;min?:number;max?:number}) {const numeric=Number(value);const invalid=!options&&min!==undefined&&max!==undefined&&(!Number.isFinite(numeric)||numeric<min||numeric>max);return <label className={`field ${invalid?"field-invalid":""}`}><span>{label}{!options&&min!==undefined&&max!==undefined&&<small>{min}–{max}</small>}</span><div>{options?<select value={value} onChange={event=>onChange(event.target.value)}>{options.map(option=><option key={option}>{option}</option>)}</select>:<input type="number" inputMode="decimal" step={step||"any"} value={value} aria-invalid={invalid} onChange={event=>onChange(event.target.value)}/>} {unit&&<em>{unit}</em>}</div></label>}
 function Metric({label,value,delta}:{label:string;value:string;delta:string}) {return <div className="metric"><span>{label}</span><b>{value}</b><small>{delta} ↗</small></div>}
 function Gauge({label,value}:{label:string;value:number}) {return <div><div className="gauge" style={{"--p":`${Math.max(0,Math.min(100,value))*3.6}deg`} as React.CSSProperties}><b>{value.toFixed(0)}%</b></div><span>{label}</span></div>}
 function AgentSteps() {return <div className="agent-steps"><div className="agent-orb">✦</div><b>Optimization agent is working</b>{["Validating all 9 inputs","Running deterministic scenario inference","Testing baseline and safe setpoints","Evaluating gas limits and equipment states","Recording the audit evidence"].map((step,index)=><span key={step} style={{animationDelay:`${index*.15}s`}}><i>✓</i>{step}</span>)}</div>}
@@ -403,3 +470,4 @@ function signed(value:number) {return `${value>=0?"+":""}${value.toFixed(1)}`}
 function shortId(value:string) {return value?.split("-")[0]?.toUpperCase()||"—"}
 function statusFromStability(value:number) {return value>=82?"OPTIMAL":value>=68?"STABLE":"REVIEW"}
 function linePoints(values:number[],width:number,height:number,padding:number) {if(!values.length)return"";const min=Math.min(...values),max=Math.max(...values),span=max-min||1;return values.map((value,index)=>`${padding+index*((width-padding*2)/Math.max(1,values.length-1))},${height-padding-((value-min)/span)*(height-padding*2)}`).join(" ")}
+function linePointsDomain(values:number[],domain:number[],width:number,height:number,padding:number) {if(!values.length)return"";const min=Math.min(...domain),max=Math.max(...domain),span=max-min||1;return values.map((value,index)=>`${padding+index*((width-padding*2)/Math.max(1,values.length-1))},${height-padding-((value-min)/span)*(height-padding*2)}`).join(" ")}

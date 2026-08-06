@@ -16,12 +16,18 @@ test("builds the Aquaivolt command center with production metadata", async () =>
   assert.match(page, /SIMULATION MODE/);
   assert.match(page, /DATA & AUDIT TRAIL/);
   assert.match(page, /6-METRIC BIOGAS OPTIMIZATION/);
+  assert.match(page, /MODEL EXECUTION & TRANSPARENCY/);
+  assert.match(page, /SENSOR CONFIGURATION/);
+  assert.match(page, /Open backend model card/);
+  assert.match(page, /Numeric evidence/);
+  assert.match(page, /All nine fields are editable/);
   assert.match(page, /CH₄ \+ CO₂ \+ converted H₂S = 100%/);
   assert.doesNotMatch(page, /Maximum O₂|Four-gas|4 gases|4-in-1|H₂S \/ O₂/);
   assert.match(layout, /Aquaivolt AI Biogas Command Center/);
   assert.match(layout, /og\.png/);
   assert.equal(JSON.parse(hosting).d1, "DB");
   assert.doesNotMatch(page + layout, /codex-preview|Your site is taking shape|SkeletonPreview/);
+  await access(new URL("app/api/model/route.ts", root));
 });
 
 test("packages the server, social card, hosting metadata, and D1 migration", async () => {

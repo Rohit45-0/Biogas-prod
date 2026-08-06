@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "../../lib/auth";
 import { getThresholds, recordSimulation } from "../../lib/audit";
-import { modelMetadata } from "../../lib/system";
+import { modelCard, modelMetadata } from "../../lib/system";
 
 type Scenario = {
   feedstock: string; temperature: number; ph: number; olr: number; hrt: number; codIn: number;
@@ -74,6 +74,32 @@ export async function POST(req:Request) {
 
   const distances = scenarios.map((scenario)=>distanceToScenario(safe,scenario));
   const weights = distances.map((distance)=>Math.exp(-.5*distance));
+  const weightTotal = weights.reduce((sum,value)=>sum+value,0) || 1;
+  const nearestScenarios = scenarios.map((scenario,index)=>({
+    anchor:`OPT-${String(index+1).padStart(2,"0")}`,
+    feedstock:scenario.feedstock,
+    distance:round(distances[index],3),
+    weight:round(weights[index]/weightTotal*100,1),
+  })).sort((a,b)=>b.weight-a.weight).slice(0,3);
+  const closestScenarioIndex = distances.indexOf(Math.min(...distances));
+  const closestScenario = scenarios[closestScenarioIndex];
+  const featureDistanceValues = [
+    {label:"Feedstock",value:safe.feedstock===closestScenario.feedstock?0:4},
+    {label:"Feed rate",value:((safe.feedRate-846)/26)**2},
+    {label:"Temperature",value:((safe.temperature-closestScenario.temperature)/1.4)**2},
+    {label:"pH",value:((safe.ph-closestScenario.ph)/.2)**2},
+    {label:"Organic loading",value:((safe.olr-closestScenario.olr)/.9)**2},
+    {label:"Retention time",value:((safe.hrt-closestScenario.hrt)/4.5)**2},
+    {label:"COD input",value:((safe.codIn-closestScenario.codIn)/1900)**2},
+    {label:"VFA",value:((safe.vfa-1100)/1100)**2},
+    {label:"Mixer speed",value:((safe.mixing-50)/25)**2},
+  ];
+  const featureDistanceTotal = featureDistanceValues.reduce((sum,item)=>sum+item.value,0) || 1;
+  const featureInfluence = featureDistanceValues.map(item=>({
+    label:item.label,
+    contribution:round(item.value/featureDistanceTotal*100,1),
+    interpretation:item.value<.03?"Near reference":item.value<.4?"Moderate distance":"Strong distance",
+  }));
   const baseGasBefore = weightedValue(weights,"gasBefore");
   const baseGasAfter = weightedValue(weights,"gasAfter");
   const baseMethaneBefore = weightedValue(weights,"methaneBefore");
@@ -182,7 +208,9 @@ export async function POST(req:Request) {
   const hourlyForecast = Array.from({length:13},(_,index)=>{
     const wave = Math.sin(index*.92)*.012 + Math.cos(index*.39)*.006;
     const settling = (index/12)*.008;
+    const baselineWave = Math.sin(index*.86+.35)*.008 + Math.cos(index*.31)*.004;
     return {hour:index*2,biogas:biogas*(.978+wave+settling),electricity:electricity*(.982+wave*.78+settling),
+      baselineBiogas:baselineBiogas*(.982+baselineWave),baselineElectricity:baselineElectricity*(.984+baselineWave*.72),
       ch4:clamp(methanePct-.8+index*.07+Math.sin(index)*.25,48,74),co2:clamp(co2Pct+.65-index*.055-Math.sin(index)*.18,23,52),
       h2s:clamp(h2s*(1.08-index*.006+Math.cos(index)*.015),40,1700)};
   });
@@ -204,15 +232,31 @@ export async function POST(req:Request) {
 
   const runId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
+  const modelTrace = {
+    executionId:runId,executedAt:createdAt,endpoint:"POST /api/predict",algorithm:modelCard.algorithm,
+    implementation:modelCard.implementation,randomized:modelCard.randomized,inputCount:modelCard.inputCount,
+    scenarioCount:modelCard.scenarioCount,coverageRows:modelCard.coverageRows,status:modelCard.status,
+    stages:[
+      {label:"Validate inputs",status:"complete",detail:`9 inputs checked; ${outOfRange?"unsupported values clipped":"all within supported coverage"}`},
+      {label:"Match scenarios",status:"complete",detail:`10 anchors weighted; closest ${nearestScenarios[0]?.anchor}`},
+      {label:"Infer baseline",status:"complete",detail:`${baselineBiogas.toFixed(1)} m³/d modeled baseline`},
+      {label:"Evaluate AI scenario",status:"complete",detail:`${biogas.toFixed(1)} m³/d and ${methanePct.toFixed(1)}% CH₄`},
+      {label:"Check safeguards",status:"complete",detail:`${alerts.filter(alert=>alert.status!=="normal").length} simulated threshold alert(s)`},
+      {label:"Record evidence",status:"complete",detail:"Audit persistence requested for this run"},
+    ],
+    nearestScenarios,featureInfluence,
+    previousComparison:Number.isFinite(previousBiogas)?{available:true,biogasBefore:previousBiogas,biogasAfter:biogas,delta:biogas-previousBiogas}:{available:false,biogasBefore:null,biogasAfter:biogas,delta:null},
+    limitations:modelCard.limitations,
+  };
   const responseData = {biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,
     generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,5),forecast,hourlyForecast,
     bestSetpoints,agentMessage,modelName:modelMetadata.name,modelVersion:modelMetadata.version,modelFit:modelMetadata.fit,outOfRange,
-    confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,performanceMetrics,alerts,equipmentStates,inputEffects,
+    confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,performanceMetrics,alerts,equipmentStates,inputEffects,modelTrace,
     facility:{name:thresholds.facilityName,location:thresholds.facilityLocation},mode:"SIMULATION",runId,createdAt};
   let auditSaved = false;
   try {
     auditSaved = await recordSimulation({id:runId,username:session.username,role:session.role,feedstock,inputs:safe,
-      outputs:{baseline,optimized,codRemoval,stability,confidence,improvement,alerts,recommendations:recommendations.slice(0,5)},modelVersion:modelMetadata.version});
+      outputs:{baseline,optimized,codRemoval,stability,confidence,improvement,alerts,recommendations:recommendations.slice(0,5),modelTrace},modelVersion:modelMetadata.version});
   } catch {
     // Prediction remains available even if audit persistence is temporarily down.
   }
