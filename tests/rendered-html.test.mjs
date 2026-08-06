@@ -15,6 +15,9 @@ test("builds the Aquaivolt command center with production metadata", async () =>
   assert.match(page, /BASELINE → AI OPTIMIZATION EVIDENCE/);
   assert.match(page, /SIMULATION MODE/);
   assert.match(page, /DATA & AUDIT TRAIL/);
+  assert.match(page, /6-METRIC BIOGAS OPTIMIZATION/);
+  assert.match(page, /CH₄ \+ CO₂ \+ converted H₂S = 100%/);
+  assert.doesNotMatch(page, /Maximum O₂|Four-gas|4 gases|4-in-1|H₂S \/ O₂/);
   assert.match(layout, /Aquaivolt AI Biogas Command Center/);
   assert.match(layout, /og\.png/);
   assert.equal(JSON.parse(hosting).d1, "DB");

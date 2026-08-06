@@ -113,18 +113,23 @@ export async function POST(req:Request) {
   const pressure = clamp(11+gasFlow*.07,12,42);
   const h2s = clamp(620-(safe.ph-6.8)*310+(safe.vfa-1100)*.13,60,1500);
   const baselineH2s = clamp(h2s+70+(methanePct-baselineMethanePct)*8,90,1600);
-  const oxygenPct = clamp(.42+Math.abs(safe.mixing-50)*.018+(100-stability)*.012,.25,2.8);
-  const baselineOxygenPct = clamp(oxygenPct+.28,.35,3.2);
-  const co2Pct = clamp(100-methanePct-oxygenPct-h2s/10000-.7,24,48);
-  const baselineCo2Pct = clamp(100-baselineMethanePct-baselineOxygenPct-baselineH2s/10000-.7,27,51);
+  // Client-defined simplified composition: CH4 + CO2 + H2S = 100%.
+  // H2S is measured in ppm, so divide by 10,000 before combining it with
+  // percentage values. Other trace gases are intentionally outside this model.
+  const h2sPct = h2s/10000;
+  const baselineH2sPct = baselineH2s/10000;
+  const co2Pct = clamp(100-methanePct-h2sPct,27,52);
+  const baselineCo2Pct = clamp(100-baselineMethanePct-baselineH2sPct,30,54);
   const methaneGain = (methane/baselineMethane-1)*100;
   const electricityGain = (electricity/baselineElectricity-1)*100;
+  const methaneContentGain = (methanePct/baselineMethanePct-1)*100;
+  const co2Reduction = (1-co2Pct/baselineCo2Pct)*100;
+  const h2sReduction = (1-h2s/baselineH2s)*100;
 
   const optimizationTargets = [
-    {label:"Methane Production",value:methaneGain}, {label:"Electricity Output",value:electricityGain},
-    {label:"COD Removal",value:codRemoval-65}, {label:"Gas Stability",value:stability-70},
-    {label:"Generator Efficiency",value:electricityGain*.72}, {label:"Boiler Fuel Saving",value:methaneGain*.58},
-    {label:"Carbon Reduction",value:(carbon/baselineCarbon-1)*100},
+    {label:"Biogas Production",value:improvement}, {label:"CH₄ Content",value:methaneContentGain},
+    {label:"Methane Output",value:methaneGain}, {label:"CO₂ Reduction",value:co2Reduction},
+    {label:"H₂S Reduction",value:h2sReduction}, {label:"Electricity Output",value:electricityGain},
   ];
   const overallBenefit = improvement;
   const benefitTrend = Array.from({length:8},(_,index)=>overallBenefit*(.58+index*.055)+Math.sin(index*1.15)*Math.max(1,Math.abs(overallBenefit)*.045));
@@ -147,7 +152,6 @@ export async function POST(req:Request) {
   const alerts = [
     {key:"methane",label:"Methane quality",value:methanePct,unit:"%",limit:`≥ ${thresholds.methaneMinimum}%`,status:alertStatus(methanePct<thresholds.methaneMinimum),message:methanePct<thresholds.methaneMinimum?"Below configured methane target":"Within configured methane target"},
     {key:"h2s",label:"Hydrogen sulphide",value:h2s,unit:"ppm",limit:`≤ ${thresholds.h2sWarning} ppm`,status:alertStatus(h2s>thresholds.h2sWarning,h2s>thresholds.h2sWarning*1.5),message:h2s>thresholds.h2sWarning?"Treatment review recommended":"Below configured warning threshold"},
-    {key:"oxygen",label:"Oxygen ingress",value:oxygenPct,unit:"%",limit:`≤ ${thresholds.oxygenMaximum}%`,status:alertStatus(oxygenPct>thresholds.oxygenMaximum,oxygenPct>thresholds.oxygenMaximum*1.35),message:oxygenPct>thresholds.oxygenMaximum?"Inspect air ingress in simulation":"Within configured oxygen limit"},
     {key:"pressure",label:"Digester pressure",value:pressure,unit:"mbar",limit:`${thresholds.pressureMinimum}–${thresholds.pressureMaximum} mbar`,status:alertStatus(pressure<thresholds.pressureMinimum||pressure>thresholds.pressureMaximum,true),message:pressure<thresholds.pressureMinimum||pressure>thresholds.pressureMaximum?"Outside configured pressure band":"Within configured pressure band"},
   ];
   const hasCritical = alerts.some((alert)=>alert.status==="critical");
@@ -160,20 +164,27 @@ export async function POST(req:Request) {
   ];
 
   const baseline = {gasFlow:baselineGas,biogas:baselineBiogas,methanePct:baselineMethanePct,methane:baselineMethane,
-    electricity:baselineElectricity,generatorKw:baselineGeneratorKw,carbon:baselineCarbon,co2Pct:baselineCo2Pct,h2s:baselineH2s,oxygenPct:baselineOxygenPct};
-  const optimized = {gasFlow,biogas,methanePct,methane,electricity,generatorKw,carbon,co2Pct,h2s,oxygenPct};
+    electricity:baselineElectricity,generatorKw:baselineGeneratorKw,carbon:baselineCarbon,co2Pct:baselineCo2Pct,h2s:baselineH2s};
+  const optimized = {gasFlow,biogas,methanePct,methane,electricity,generatorKw,carbon,co2Pct,h2s};
   const gasComposition = [
     {key:"ch4",label:"CH₄",name:"Methane",before:baselineMethanePct,after:methanePct,unit:"%",direction:"up"},
     {key:"co2",label:"CO₂",name:"Carbon dioxide",before:baselineCo2Pct,after:co2Pct,unit:"%",direction:"down"},
     {key:"h2s",label:"H₂S",name:"Hydrogen sulphide",before:baselineH2s,after:h2s,unit:"ppm",direction:"down"},
-    {key:"o2",label:"O₂",name:"Oxygen",before:baselineOxygenPct,after:oxygenPct,unit:"%",direction:"down"},
+  ];
+  const performanceMetrics = [
+    {key:"biogas",label:"BIOGAS",name:"Total production",before:baselineBiogas,after:biogas,unit:"m³/d",direction:"up"},
+    {key:"ch4",label:"CH₄",name:"Methane content",before:baselineMethanePct,after:methanePct,unit:"%",direction:"up"},
+    {key:"methane",label:"CH₄ OUT",name:"Methane output",before:baselineMethane,after:methane,unit:"m³/d",direction:"up"},
+    {key:"co2",label:"CO₂",name:"Carbon dioxide",before:baselineCo2Pct,after:co2Pct,unit:"%",direction:"down"},
+    {key:"h2s",label:"H₂S",name:"Hydrogen sulphide",before:baselineH2s,after:h2s,unit:"ppm",direction:"down"},
+    {key:"electricity",label:"ENERGY",name:"Electricity output",before:baselineElectricity,after:electricity,unit:"kWh/d",direction:"up"},
   ];
   const hourlyForecast = Array.from({length:13},(_,index)=>{
     const wave = Math.sin(index*.92)*.012 + Math.cos(index*.39)*.006;
     const settling = (index/12)*.008;
     return {hour:index*2,biogas:biogas*(.978+wave+settling),electricity:electricity*(.982+wave*.78+settling),
       ch4:clamp(methanePct-.8+index*.07+Math.sin(index)*.25,48,74),co2:clamp(co2Pct+.65-index*.055-Math.sin(index)*.18,23,52),
-      h2s:clamp(h2s*(1.08-index*.006+Math.cos(index)*.015),40,1700),o2:clamp(oxygenPct*(1.07-index*.006+Math.sin(index*.7)*.02),.2,3.5)};
+      h2s:clamp(h2s*(1.08-index*.006+Math.cos(index)*.015),40,1700)};
   });
   const inputEffects = [
     {label:"Feedstock",value:feedstock,effect:"Selects matched biochemical scenario anchors"},
@@ -189,14 +200,14 @@ export async function POST(req:Request) {
   const previousBiogas = Number(x.previousRun?.prediction?.biogas);
   const comparison = Number.isFinite(previousBiogas) ? ` Biogas changed by ${biogas>=previousBiogas?"+":""}${(biogas-previousBiogas).toFixed(1)} m³/day versus the previous run.` : " This is the first run in the comparison.";
   const forecast = hourlyForecast.map((point)=>point.biogas);
-  const agentMessage = `Analysis complete for ${feedstock}. The deterministic multi-input scenario model estimates ${biogas.toFixed(1)} m³/day biogas, ${methanePct.toFixed(1)}% methane, and ${electricity.toFixed(1)} kWh/day.${comparison} The best modeled setpoints are pH ${bestSetpoints.ph.toFixed(2)}, ${bestSetpoints.temperature.toFixed(1)} °C, OLR ${bestSetpoints.olr.toFixed(1)}, and ${bestSetpoints.hrt} day HRT. Scenario coverage is ${confidence.toFixed(0)}%; this is input-space coverage, not validated plant accuracy.`;
+  const agentMessage = `Analysis complete for ${feedstock}. The deterministic multi-input scenario model estimates ${biogas.toFixed(1)} m³/day biogas, ${methanePct.toFixed(1)}% methane, ${co2Pct.toFixed(1)}% CO2, ${h2s.toFixed(0)} ppm H2S, and ${electricity.toFixed(1)} kWh/day.${comparison} The best modeled setpoints are pH ${bestSetpoints.ph.toFixed(2)}, ${bestSetpoints.temperature.toFixed(1)} °C, OLR ${bestSetpoints.olr.toFixed(1)}, and ${bestSetpoints.hrt} day HRT. Scenario coverage is ${confidence.toFixed(0)}%; this is input-space coverage, not validated plant accuracy.`;
 
   const runId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const responseData = {biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,
     generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,5),forecast,hourlyForecast,
     bestSetpoints,agentMessage,modelName:modelMetadata.name,modelVersion:modelMetadata.version,modelFit:modelMetadata.fit,outOfRange,
-    confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,alerts,equipmentStates,inputEffects,
+    confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,performanceMetrics,alerts,equipmentStates,inputEffects,
     facility:{name:thresholds.facilityName,location:thresholds.facilityLocation},mode:"SIMULATION",runId,createdAt};
   let auditSaved = false;
   try {
