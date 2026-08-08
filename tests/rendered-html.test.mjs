@@ -4,29 +4,25 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("builds the Aquaivolt command center with production metadata", async () => {
+test("builds the simplified before-and-after production dashboard", async () => {
   const [page, layout, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
   ]);
 
-  assert.match(page, /AI Command Center/);
-  assert.match(page, /BASELINE → AI OPTIMIZATION EVIDENCE/);
-  assert.match(page, /SIMULATION MODE/);
-  assert.match(page, /DATA & AUDIT TRAIL/);
-  assert.match(page, /6-METRIC BIOGAS OPTIMIZATION/);
-  assert.match(page, /MODEL EXECUTION & TRANSPARENCY/);
-  assert.match(page, /SENSOR CONFIGURATION/);
-  assert.match(page, /Open backend model card/);
-  assert.match(page, /Numeric evidence/);
-  assert.match(page, /All nine fields are editable/);
-  assert.match(page, /CH₄ \+ CO₂ \+ converted H₂S = 100%/);
-  assert.doesNotMatch(page, /Maximum O₂|Four-gas|4 gases|4-in-1|H₂S \/ O₂/);
+  assert.match(page, /Biogas production dashboard/);
+  assert.match(page, /Only real quantities: before, after and the extra amount/);
+  assert.match(page, /before and after/);
+  assert.match(page, /Methane/);
+  assert.match(page, /Electricity/);
+  assert.match(page, /Every field below is used by the calculation/);
+  assert.match(page, /Hour-scale sheets are research projections/);
+  assert.match(page, /No placeholder numbers are shown/);
+  assert.match(page, /m³ CH₄\/day/);
+  assert.doesNotMatch(page, /Optimization Gain|Scenario Coverage|Overall Benefit|Prototype Readiness|6-METRIC|Readiness Score/);
   assert.match(layout, /Aquaivolt AI Biogas Command Center/);
-  assert.match(layout, /og\.png/);
   assert.equal(JSON.parse(hosting).d1, "DB");
-  assert.doesNotMatch(page + layout, /codex-preview|Your site is taking shape|SkeletonPreview/);
   await access(new URL("app/api/model/route.ts", root));
 });
 

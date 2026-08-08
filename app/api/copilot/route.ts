@@ -3,14 +3,14 @@ import { retrieveKnowledge } from "../../lib/rag";
 import { getSession } from "../../lib/auth";
 
 type Inputs = { feedstock?:string; feedRate?: number; temperature?: number; ph?: number; olr?: number; hrt?: number; codIn?:number; vfa?:number; mixing?:number };
-type Prediction = { biogas?: number; methanePct?: number; electricity?: number; carbon?: number; modelName?:string; confidence?:number; runId?:string; alerts?:{label:string;status:string;message:string;value:number;unit:string;limit:string}[]; recommendations?:{title:string;detail:string}[]; bestSetpoints?: { feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number } };
+type Prediction = { biogas?: number; methane?:number; electricity?: number; carbon?: number; modelName?:string; runId?:string; alerts?:{label:string;status:string;message:string;value:number;unit:string;limit:string}[]; recommendations?:{title:string;detail:string}[]; bestSetpoints?: { feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number } };
 type Message = { role?: string; text?: string };
 
 function fallbackAnswer(question: string, inputs: Inputs, prediction: Prediction | null) {
   const q = question.toLowerCase();
   const best = prediction?.bestSetpoints ?? { feedRate:870, temperature:37, ph:7.2, olr:3.2, hrt:22, codIn:7000, vfa:1100, mixing:50 };
   const outputs = prediction?.biogas !== undefined
-    ? `The current estimate is ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methanePct?.toFixed(1)}% CH4, and ${prediction.electricity?.toFixed(1)} kWh/day.`
+    ? `The current estimate is ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methane?.toFixed(1)} m3 CH4/day methane, and ${prediction.electricity?.toFixed(1)} kWh/day.`
     : "Run a prediction first and I can explain the scenario-specific result.";
 
   if (q.includes("best") || q.includes("recommend") || q.includes("setpoint") || q.includes("improve")) {
@@ -20,7 +20,7 @@ function fallbackAnswer(question: string, inputs: Inputs, prediction: Prediction
     return `Your pH is ${inputs.ph ?? "not entered"}. The active synthetic model's best result is near pH ${best.ph.toFixed(2)}. ${outputs} Treat this as a simulation recommendation, not an automatic dosing instruction.`;
   }
   if (q.includes("methane") || q.includes("electricity") || q.includes("biogas")) {
-    return `${outputs} Biogas, methane percentage, and generator power come from the multi-input scenario inference; daily electricity is predicted generator kW multiplied by 24 hours. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixing all influence the result.`;
+    return `${outputs} Biogas volume, methane volume, and generator power come from the multi-input scenario inference; daily electricity is predicted generator kW multiplied by 24 hours. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixing all influence the result.`;
   }
   if (q.includes("alert") || q.includes("alarm") || q.includes("limit") || q.includes("attention")) {
     const active = prediction?.alerts?.filter((alert) => alert.status !== "normal") ?? [];
@@ -48,11 +48,11 @@ async function generateAnswer(question: string, inputs: Inputs, prediction: Pred
   if (!apiKey) return null;
 
   const plantState = prediction?.biogas !== undefined
-    ? `Current prediction: ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methanePct?.toFixed(1)}% CH4, ${prediction.electricity?.toFixed(1)} kWh/day, ${prediction.carbon?.toFixed(2)} tCO2e/day. Run ID: ${prediction.runId ?? "not available"}. Active simulated alerts: ${(prediction.alerts ?? []).filter((alert) => alert.status !== "normal").map((alert) => `${alert.label} ${alert.value} ${alert.unit}`).join(", ") || "none"}. Current operator recommendations: ${(prediction.recommendations ?? []).map((item) => item.title).join("; ") || "none"}.`
+    ? `Current prediction: ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methane?.toFixed(1)} m3 CH4/day methane, ${prediction.electricity?.toFixed(1)} kWh/day, ${prediction.carbon?.toFixed(2)} tCO2e/day. Run ID: ${prediction.runId ?? "not available"}. Current operator recommendations: ${(prediction.recommendations ?? []).map((item) => item.title).join("; ") || "none"}.`
     : "No prediction has been run in this chat yet.";
   const currentInputs = `Current inputs: feedstock ${inputs.feedstock ?? "n/a"}, feed rate ${inputs.feedRate ?? "n/a"} kg VS/day, temperature ${inputs.temperature ?? "n/a"} C, pH ${inputs.ph ?? "n/a"}, OLR ${inputs.olr ?? "n/a"} kg COD/m3/day, HRT ${inputs.hrt ?? "n/a"} days, COD ${inputs.codIn ?? "n/a"} mg/L, VFA ${inputs.vfa ?? "n/a"} mg/L, mixing ${inputs.mixing ?? "n/a"} RPM.`;
   const recentChat = history.slice(-6).map((message) => `${message.role === "user" ? "User" : "Copilot"}: ${String(message.text ?? "").slice(0, 500)}`).join("\n");
-  const prompt = `You are Aqua Copilot, a concise, practical assistant for a biogas dashboard prototype. Answer the user's question using the retrieved project evidence below and the current simulation context. If evidence is missing, say so. Do not imply that synthetic data proves real plant performance. Do not instruct automatic control of equipment or dosing; frame recommendations as simulations requiring operator review. Mention the active model's synthetic limits whenever material. Use 2 to 5 short sentences and include no markdown table.\n\nRetrieved project evidence:\n${context}\n\n${plantState}\n${currentInputs}\n\nRecent chat:\n${recentChat || "None"}\n\nUser question: ${question}`;
+  const prompt = `You are Aqua Copilot, a concise, practical assistant for a biogas dashboard prototype. Answer the user's question using the retrieved project evidence below and the current simulation context. Use simple language and absolute units such as m3/day and kWh/day; do not use percentage numbers. If evidence is missing, say so. Do not imply that synthetic data proves real plant performance. Do not instruct automatic control of equipment or dosing; frame recommendations as simulations requiring operator review. Mention the active model's synthetic limits whenever material. Use 2 to 5 short sentences and include no markdown table.\n\nRetrieved project evidence:\n${context}\n\n${plantState}\n${currentInputs}\n\nRecent chat:\n${recentChat || "None"}\n\nUser question: ${question}`;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
