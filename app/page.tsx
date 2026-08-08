@@ -13,9 +13,11 @@ type PlantOutput = {
 type Recommendation = {
   title:string; detail:string; parameter:string; current:number; target:number; unit:string;
 };
+type EquipmentState = {label:string;state:string;detail:string;mode:string;tone:string};
 type Prediction = {
-  biogas:number; methane:number; electricity:number; bestSetpoints:Omit<Inputs,"feedstock">;
+  biogas:number; methane:number; electricity:number; pressure:number; h2s:number; bestSetpoints:Omit<Inputs,"feedstock">;
   recommendations:Recommendation[]; baseline:PlantOutput; optimized:PlantOutput;
+  equipmentStates:EquipmentState[];
   modelName:string; modelVersion:string; modelFit:string; outOfRange:boolean; extrapolatedInputs?:string[];
   runId:string; createdAt:string; agentMessage:string;
   audit:{saved:boolean;status:string};
@@ -127,6 +129,7 @@ export default function Home(){
         <button className="active" onClick={()=>document.getElementById("overview")?.scrollIntoView()}><span>⌂</span>Overview</button>
         <button onClick={()=>document.getElementById("inputs")?.scrollIntoView()}><span>▦</span>Plant inputs</button>
         {(Object.keys(outputs) as OutputKey[]).map(key=><button key={key} className={activeOutput===key?"strong":""} onClick={()=>{setActiveOutput(key);document.getElementById("comparison")?.scrollIntoView();}}><span>{outputs[key].icon}</span>{outputs[key].label}</button>)}
+        <button onClick={()=>document.getElementById("virtual-monitoring")?.scrollIntoView()}><span>▣</span>Virtual monitoring</button>
         <button onClick={()=>document.getElementById("history")?.scrollIntoView()}><span>≡</span>Run history</button>
         {auth.role==="admin"&&<button onClick={()=>void openSettings()}><span>⚙</span>Settings</button>}
       </nav>
@@ -168,6 +171,7 @@ export default function Home(){
         <div className="section-heading"><div><small>STEP 2</small><h2>See the result</h2><p>Only real quantities: before, after and the extra amount.</p></div>{result&&<span className="run-pill">Run {result.runId.split("-")[0].toUpperCase()}</span>}</div>
         <div className="output-cards">
           {(Object.keys(outputs) as OutputKey[]).map(key=><OutputCard key={key} outputKey={key} result={result} active={activeOutput===key} onClick={()=>setActiveOutput(key)}/>) }
+          <button className="output-card monitoring-card" style={{"--accent":"#6556d9"} as React.CSSProperties} onClick={()=>document.getElementById("virtual-monitoring")?.scrollIntoView()}><span className="output-icon">▣</span><div><small>Virtual monitoring</small><b>{result?"Simulation ready":"Waiting"}</b><p>{result?`Run ${result.runId.split("-")[0].toUpperCase()} reflected below`:"Run a calculation"}</p></div><i>↓</i></button>
         </div>
       </section>
 
@@ -178,6 +182,11 @@ export default function Home(){
       <section className="validation-panel">
         <div className="section-heading compact"><div><small>SUPPLIED DATA</small><h2>{active.label} across 10 validation runs</h2><p>Grey is the baseline. Colour is the optimized value from the supplied workbook.</p></div></div>
         <ValidationChart outputKey={activeOutput}/>
+      </section>
+
+      <section className="virtual-monitor-panel" id="virtual-monitoring" aria-live="polite">
+        <div className="section-heading"><div><small>VIRTUAL PLANT</small><h2>Monitoring system</h2><p>Manual inputs and model outputs shown as a simulated plant flow.</p></div><span className="simulation-label">NO PHYSICAL DEVICE CONNECTED</span></div>
+        {loading?<Working/>:result&&lastRunInputs?<VirtualMonitoring result={result} inputs={lastRunInputs}/>:<div className="monitor-empty"><span>▣</span><b>Virtual monitoring is waiting</b><p>Run Calculate production to populate the virtual monitoring screen.</p></div>}
       </section>
 
       <section className="history-panel" id="history">
@@ -214,6 +223,41 @@ function Comparison({outputKey,result}:{outputKey:OutputKey;result:Prediction}){
 function ValidationChart({outputKey}:{outputKey:OutputKey}){
   const series=validationSeries[outputKey];const meta=outputs[outputKey];const all=[...series.before,...series.after];const max=Math.max(...all)*1.08;const width=880,height=230,pad=34;const points=(values:number[])=>values.map((value,index)=>`${pad+index*((width-pad*2)/(values.length-1))},${height-pad-(value/max)*(height-pad*2)}`).join(" ");
   return <div className="validation-chart"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${meta.label} before and after across ten supplied validation runs`}><g className="chart-grid">{[0,1,2,3].map(index=><line key={index} x1={pad} x2={width-pad} y1={pad+index*48} y2={pad+index*48}/>)}</g><polyline className="validation-before" points={points(series.before)}/><polyline className="validation-after" style={{stroke:meta.color}} points={points(series.after)}/>{series.after.map((value,index)=><circle key={index} cx={pad+index*((width-pad*2)/(series.after.length-1))} cy={height-pad-(value/max)*(height-pad*2)} r="4" style={{fill:meta.color}}/>)}{series.after.map((_,index)=><text key={index} x={pad+index*((width-pad*2)/(series.after.length-1))} y={height-8} textAnchor="middle">{index+1}</text>)}</svg><div className="chart-labels"><span><i className="grey"/>Before AI</span><span><i style={{background:meta.color}}/>After AI</span><b>Unit: {meta.unit}</b></div></div>;
+}
+
+function VirtualMonitoring({result,inputs}:{result:Prediction;inputs:Inputs}){
+  const state=(label:string)=>result.equipmentStates?.find(item=>item.label===label);
+  const feedValve=state("Wastewater feed valve");
+  const mixer=state("Mixer drive");
+  const outlet=state("Biogas outlet valve");
+  const generator=state("Generator");
+  return <div className="virtual-monitor">
+    <div className="monitor-runline"><span><i/>SIMULATION COMPLETE</span><b>Run {result.runId.split("-")[0].toUpperCase()}</b><em>Calculated {new Date(result.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</em></div>
+    <div className="process-flow">
+      <article className="process-stage feed-stage">
+        <div className="stage-title"><span>01</span><div><small>MANUAL INPUT</small><h3>Wastewater tank</h3></div></div>
+        <div className="tank-shape"><div/><b>COD</b><strong>{format(inputs.codIn)}</strong><small>mg/L</small></div>
+        <dl><div><dt>Feedstock</dt><dd>{inputs.feedstock}</dd></div><div><dt>Feed rate</dt><dd>{format(inputs.feedRate)} kg VS/day</dd></div><div><dt>Feed valve</dt><dd className={feedValve?.tone==="warning"?"state-warning":"state-good"}>{feedValve?.state||"PULSED"}</dd></div></dl>
+      </article>
+      <div className="process-link"><span>FLOW</span><i/><b>→</b></div>
+      <article className="process-stage digester-stage">
+        <div className="stage-title"><span>02</span><div><small>MANUAL INPUT</small><h3>Biogas digester</h3></div></div>
+        <div className="digester-shape"><i/><b>AQUAIVOLT</b><span>MIXING</span></div>
+        <dl><div><dt>Temperature</dt><dd>{format(inputs.temperature)} °C</dd></div><div><dt>pH</dt><dd>{format(inputs.ph)}</dd></div><div><dt>Retention time</dt><dd>{format(inputs.hrt)} days</dd></div><div><dt>Mixer</dt><dd className={mixer?.tone==="warning"?"state-warning":"state-good"}>{mixer?.state||"ON"} · {format(inputs.mixing)} RPM</dd></div></dl>
+      </article>
+      <div className="process-link"><span>GAS</span><i/><b>→</b></div>
+      <article className="process-stage output-stage">
+        <div className="stage-title"><span>03</span><div><small>MODEL OUTPUT</small><h3>Gas and energy</h3></div></div>
+        <div className="storage-shape"><div/><b>BIOGAS</b><strong>{format(result.optimized.biogas)}</strong><small>m³/day</small></div>
+        <dl><div><dt>Methane</dt><dd>{format(result.optimized.methane)} m³ CH₄/day</dd></div><div><dt>Electricity</dt><dd>{format(result.optimized.electricity)} kWh/day</dd></div><div><dt>Pressure</dt><dd>{format(result.pressure)} mbar</dd></div><div><dt>H₂S</dt><dd>{format(result.h2s)} ppm</dd></div></dl>
+      </article>
+    </div>
+    <div className="monitor-command-row">
+      <div><small>SIMULATED OUTLET VALVE</small><b className={outlet?.tone==="warning"?"state-warning":"state-good"}>{outlet?.state||"OPEN"}</b><span>{outlet?.detail||`Pressure ${format(result.pressure)} mbar`}</span></div>
+      <div><small>SIMULATED GENERATOR</small><b className={generator?.tone==="warning"?"state-warning":"state-good"}>{generator?.state||"ENABLED"}</b><span>{generator?.detail||`Estimated ${format(result.optimized.generatorKw)} kW`}</span></div>
+      <p>These are model estimates and simulated states. They do not read sensors or send commands to hardware.</p>
+    </div>
+  </div>;
 }
 
 function RunTable({runs,outputKey}:{runs:RunRecord[];outputKey:OutputKey}){
