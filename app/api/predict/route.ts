@@ -25,10 +25,18 @@ const scenarios: Scenario[] = [
   {feedstock:"Paper Mill",temperature:36.9,ph:7.22,olr:3.3,hrt:22,codIn:8000,methaneBefore:58,methaneAfter:66,gasBefore:135,gasAfter:156,generatorBefore:48,generatorAfter:56},
 ];
 
-const bounds = {
+const coreBounds = {
   feedRate:[820,870], temperature:[34.08,38.87], ph:[6.82,7.58], olr:[1.55,6.38],
   hrt:[15.45,34.62], codIn:[3205,11864], vfa:[251,2963], mixing:[20,79],
 } as const;
+// Broad physical guardrails prevent impossible arithmetic, but do not block a
+// user-entered scenario. Values outside coreBounds are extrapolated from the
+// nearest supplied before/after patterns with explicit process penalties.
+const physicalBounds = {
+  feedRate:[50,2000], temperature:[10,80], ph:[3,11], olr:[.1,250],
+  hrt:[.02,90], codIn:[100,50000], vfa:[0,10000], mixing:[0,200],
+} as const;
+const defaults = {feedRate:846,temperature:36.5,ph:7.2,olr:3.2,hrt:22,codIn:7600,vfa:1100,mixing:50} as const;
 const clamp = (value:number, min:number, max:number) => Math.min(max, Math.max(min, value));
 const round = (value:number, digits = 2) => Number(value.toFixed(digits));
 
@@ -68,12 +76,14 @@ export async function POST(req:Request) {
     hrt:Number(x.hrt), codIn:Number(x.codIn), vfa:Number(x.vfa), mixing:Number(x.mixing),
   };
   const keys = ["feedRate","temperature","ph","olr","hrt","codIn","vfa","mixing"] as const;
-  const outOfRange = keys.some((key)=>!Number.isFinite(input[key]) || input[key] < bounds[key][0] || input[key] > bounds[key][1]);
+  const extrapolatedInputs = keys.filter((key)=>!Number.isFinite(input[key]) || input[key] < coreBounds[key][0] || input[key] > coreBounds[key][1]);
+  const outOfRange = extrapolatedInputs.length > 0;
   const safe = {...input};
-  for (const key of keys) safe[key] = clamp(Number.isFinite(input[key]) ? input[key] : (bounds[key][0]+bounds[key][1])/2, bounds[key][0], bounds[key][1]);
+  for (const key of keys) safe[key] = clamp(Number.isFinite(input[key]) ? input[key] : defaults[key], physicalBounds[key][0], physicalBounds[key][1]);
 
   const distances = scenarios.map((scenario)=>distanceToScenario(safe,scenario));
-  const weights = distances.map((distance)=>Math.exp(-.5*distance));
+  const minimumDistance = Math.min(...distances);
+  const weights = distances.map((distance)=>Math.exp(-.5*Math.min(40,distance-minimumDistance)));
   const weightTotal = weights.reduce((sum,value)=>sum+value,0) || 1;
   const nearestScenarios = scenarios.map((scenario,index)=>({
     anchor:`OPT-${String(index+1).padStart(2,"0")}`,
@@ -107,17 +117,30 @@ export async function POST(req:Request) {
   const baseGeneratorBefore = weightedValue(weights,"generatorBefore");
   const baseGeneratorAfter = weightedValue(weights,"generatorAfter");
 
-  // Modifiers are conservative and explicit because VFA/mixing are not present
-  // in the ten paired optimization anchors. They still change every output while
-  // avoiding claims of a causal plant-validated relationship.
-  const feedFactor = clamp(1 + (safe.feedRate-846)*.0035,.9,1.09);
-  const vfaFactor = clamp(1 - .06*((safe.vfa-1100)/1850)**2,.91,1);
-  const mixingFactor = clamp(1 - .055*((safe.mixing-50)/30)**2,.92,1);
-  const gasFlow = clamp(baseGasAfter*feedFactor*vfaFactor*mixingFactor,70,240);
-  const methanePct = clamp(baseMethaneAfter+(feedFactor-1)*2+(vfaFactor-1)*18+(mixingFactor-1)*8,48,72);
-  const generatorKw = clamp(baseGeneratorAfter*(gasFlow/baseGasAfter)*(methanePct/baseMethaneAfter),20,95);
-  const baselineGas = baseGasBefore*feedFactor*clamp(1-(Math.abs(safe.vfa-1100)/2100)*.025,.965,1);
-  const baselineMethanePct = clamp(baseMethaneBefore+(feedFactor-1)*.7+(vfaFactor-1)*6,46,69);
+  const bestScenario = scenarios.filter((scenario)=>scenario.feedstock===feedstock).sort((a,b)=>b.generatorAfter-a.generatorAfter)[0] ?? scenarios[0];
+  const bestSetpoints = {feedRate:870,temperature:bestScenario.temperature,ph:bestScenario.ph,olr:bestScenario.olr,hrt:bestScenario.hrt,codIn:bestScenario.codIn,vfa:1100,mixing:50};
+
+  // The paired sheets show positive feed/output and COD/gas trends. Outside the
+  // common rows, these modifiers continue those patterns gradually while pH,
+  // temperature, VFA, mixing, loading and HRT move toward a conservative floor.
+  const feedFactor = clamp(1 + (safe.feedRate-846)*.0035,.45,1.45);
+  const temperatureFactor = clamp(1-.018*Math.abs(safe.temperature-bestSetpoints.temperature)**1.35,.55,1);
+  const phFactor = clamp(1-.19*Math.abs(safe.ph-bestSetpoints.ph)**1.4,.5,1);
+  const olrFactor = safe.olr<=bestSetpoints.olr
+    ? clamp(.7+.3*(safe.olr/bestSetpoints.olr),.52,1)
+    : clamp(1-.04*(safe.olr-bestSetpoints.olr)**1.2,.5,1);
+  const hrtFactor = safe.hrt<bestSetpoints.hrt
+    ? clamp(.68+.32*(safe.hrt/bestSetpoints.hrt),.5,1)
+    : clamp(1+Math.min(.04,(safe.hrt-bestSetpoints.hrt)*.003),1,1.04);
+  const codFactor = clamp(Math.sqrt(safe.codIn/bestSetpoints.codIn),.62,1.25);
+  const vfaFactor = clamp(1-.06*((safe.vfa-1100)/1850)**2,.68,1);
+  const mixingFactor = clamp(1-.055*((safe.mixing-50)/30)**2,.7,1);
+  const processFactor = clamp(temperatureFactor*phFactor*olrFactor*hrtFactor*codFactor,.3,1.28);
+  const gasFlow = clamp(baseGasAfter*feedFactor*vfaFactor*mixingFactor*processFactor,8,500);
+  const methanePct = clamp(baseMethaneAfter+(feedFactor-1)*2-(1-temperatureFactor)*12-(1-phFactor)*18-(1-vfaFactor)*15-(1-mixingFactor)*7,32,74);
+  const generatorKw = clamp(baseGeneratorAfter*(gasFlow/baseGasAfter)*(methanePct/baseMethaneAfter),3,180);
+  const baselineGas = clamp(baseGasBefore*feedFactor*clamp(1-(Math.abs(safe.vfa-1100)/2100)*.025,.82,1)*clamp(processFactor*.98,.29,1.25),6,470);
+  const baselineMethanePct = clamp(baseMethaneBefore+(feedFactor-1)*.7-(1-temperatureFactor)*8-(1-phFactor)*12-(1-vfaFactor)*6,30,70);
   const baselineGeneratorKw = baseGeneratorBefore*feedFactor*(baselineGas/(baseGasBefore*feedFactor));
   const biogas = gasFlow*24;
   const baselineBiogas = baselineGas*24;
@@ -129,10 +152,8 @@ export async function POST(req:Request) {
   const carbon = electricity*.000708;
   const baselineCarbon = baselineElectricity*.000708;
 
-  const bestScenario = scenarios.filter((scenario)=>scenario.feedstock===feedstock).sort((a,b)=>b.generatorAfter-a.generatorAfter)[0] ?? scenarios[0];
-  const bestSetpoints = {feedRate:870,temperature:bestScenario.temperature,ph:bestScenario.ph,olr:bestScenario.olr,hrt:bestScenario.hrt,codIn:bestScenario.codIn,vfa:1100,mixing:50};
   const coverageDistance = Math.sqrt(Math.min(...distances) + ((safe.feedRate-846)/26)**2 + ((safe.vfa-1100)/1100)**2 + ((safe.mixing-50)/25)**2);
-  const confidence = clamp(94-coverageDistance*8-(outOfRange?14:0),52,94);
+  const confidence = clamp(94-coverageDistance*8-extrapolatedInputs.length*4,25,94);
   const stability = clamp(94-Math.abs(safe.ph-bestSetpoints.ph)*28-Math.abs(safe.temperature-bestSetpoints.temperature)*3
     -Math.max(0,safe.olr-bestSetpoints.olr)*4-Math.abs(safe.vfa-1100)/180-Math.abs(safe.mixing-50)*.25,35,95);
   const codRemoval = clamp(72+(methanePct-55)*.55+(safe.hrt-15)*.35-Math.abs(safe.vfa-1100)/250,52,92);
@@ -172,7 +193,7 @@ export async function POST(req:Request) {
   if (Math.abs(safe.mixing-bestSetpoints.mixing)>4) add("Mixing",safe.mixing,bestSetpoints.mixing,"RPM",`Compare mixing at ${bestSetpoints.mixing} RPM`,"Confirm parasitic power and avoid excessive mixing.",Math.abs(safe.mixing-bestSetpoints.mixing)*.12);
   recommendations.sort((a,b)=>b.impact-a.impact);
   if (!recommendations.length) add("Scenario",1,1,"", "Hold current scenario inputs",`Inputs are close to the strongest supplied ${feedstock} anchor.`,1);
-  if (outOfRange) recommendations.unshift({parameter:"Coverage",current:0,target:1,unit:"",title:"Input clipped to supported range",detail:"At least one value is outside synthetic SCADA coverage.",impact:0,tone:"down"});
+  if (outOfRange) recommendations.push({parameter:"Estimate",current:0,target:1,unit:"",title:"Nearest-pattern estimate used",detail:`${extrapolatedInputs.length} input value(s) extend beyond the common supplied rows; the model applied gradual extrapolation without clipping them to the old boundary.`,impact:0,tone:"down"});
 
   const thresholds = await getThresholds();
   const alerts = [
@@ -228,7 +249,7 @@ export async function POST(req:Request) {
   const previousBiogas = Number(x.previousRun?.prediction?.biogas);
   const comparison = Number.isFinite(previousBiogas) ? ` Biogas changed by ${biogas>=previousBiogas?"+":""}${(biogas-previousBiogas).toFixed(1)} m³/day versus the previous run.` : " This is the first run in the comparison.";
   const forecast = hourlyForecast.map((point)=>point.biogas);
-  const agentMessage = `Analysis complete for ${feedstock}. The deterministic multi-input scenario model estimates ${biogas.toFixed(1)} m³/day biogas, ${methanePct.toFixed(1)}% methane, ${co2Pct.toFixed(1)}% CO2, ${h2s.toFixed(0)} ppm H2S, and ${electricity.toFixed(1)} kWh/day.${comparison} The best modeled setpoints are pH ${bestSetpoints.ph.toFixed(2)}, ${bestSetpoints.temperature.toFixed(1)} °C, OLR ${bestSetpoints.olr.toFixed(1)}, and ${bestSetpoints.hrt} day HRT. Scenario coverage is ${confidence.toFixed(0)}%; this is input-space coverage, not validated plant accuracy.`;
+  const agentMessage = `Analysis complete for ${feedstock}. The deterministic multi-input scenario model estimates ${biogas.toFixed(1)} m³/day biogas, ${methane.toFixed(1)} m³ CH₄/day, and ${electricity.toFixed(1)} kWh/day.${comparison} The best modeled setpoints are pH ${bestSetpoints.ph.toFixed(2)}, ${bestSetpoints.temperature.toFixed(1)} °C, OLR ${bestSetpoints.olr.toFixed(1)}, and ${bestSetpoints.hrt} day HRT.${outOfRange?` ${extrapolatedInputs.length} input value(s) were estimated from the nearest supplied patterns.`:""}`;
 
   const runId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
@@ -237,7 +258,7 @@ export async function POST(req:Request) {
     implementation:modelCard.implementation,randomized:modelCard.randomized,inputCount:modelCard.inputCount,
     scenarioCount:modelCard.scenarioCount,coverageRows:modelCard.coverageRows,status:modelCard.status,
     stages:[
-      {label:"Validate inputs",status:"complete",detail:`9 inputs checked; ${outOfRange?"unsupported values clipped":"all within supported coverage"}`},
+      {label:"Validate inputs",status:"complete",detail:`9 inputs checked; ${outOfRange?`${extrapolatedInputs.length} value(s) extrapolated from nearest patterns`:"all matched to common supplied rows"}`},
       {label:"Match scenarios",status:"complete",detail:`10 anchors weighted; closest ${nearestScenarios[0]?.anchor}`},
       {label:"Infer baseline",status:"complete",detail:`${baselineBiogas.toFixed(1)} m³/d modeled baseline`},
       {label:"Evaluate AI scenario",status:"complete",detail:`${biogas.toFixed(1)} m³/d and ${methanePct.toFixed(1)}% CH₄`},
@@ -250,7 +271,7 @@ export async function POST(req:Request) {
   };
   const responseData = {biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,
     generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,5),forecast,hourlyForecast,
-    bestSetpoints,agentMessage,modelName:modelMetadata.name,modelVersion:modelMetadata.version,modelFit:modelMetadata.fit,outOfRange,
+    bestSetpoints,agentMessage,modelName:modelMetadata.name,modelVersion:modelMetadata.version,modelFit:modelMetadata.fit,outOfRange,extrapolatedInputs,
     confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,performanceMetrics,alerts,equipmentStates,inputEffects,modelTrace,
     facility:{name:thresholds.facilityName,location:thresholds.facilityLocation},mode:"SIMULATION",runId,createdAt};
   let auditSaved = false;

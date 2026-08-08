@@ -1,1 +1,5 @@
 /* Intentionally small: the simplified dashboard is styled in globals.css. */
+
+.extrapolation-note{margin-top:10px;padding:8px 10px;border-radius:8px;background:#f2f7fb;color:#60748b;font-size:7.5px;line-height:1.45}
+.calculate-button{margin-top:10px}
+.calculate-button:disabled{opacity:.7;cursor:wait}

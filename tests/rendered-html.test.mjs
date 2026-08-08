@@ -19,8 +19,11 @@ test("builds the simplified before-and-after production dashboard", async () => 
   assert.match(page, /Every field below is used by the calculation/);
   assert.match(page, /Hour-scale sheets are research projections/);
   assert.match(page, /No placeholder numbers are shown/);
+  assert.match(page, /Nothing runs until you click Calculate/);
+  assert.match(page, /Values beyond the supplied rows are estimated from the nearest data patterns/);
   assert.match(page, /m³ CH₄\/day/);
   assert.doesNotMatch(page, /Optimization Gain|Scenario Coverage|Overall Benefit|Prototype Readiness|6-METRIC|Readiness Score/);
+  assert.doesNotMatch(page, /outside the normal model range|Check highlighted values|issues\.length>0/);
   assert.match(layout, /Aquaivolt AI Biogas Command Center/);
   assert.equal(JSON.parse(hosting).d1, "DB");
   await access(new URL("app/api/model/route.ts", root));

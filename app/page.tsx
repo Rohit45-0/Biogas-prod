@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type Inputs = {
   feedstock:string; feedRate:number; temperature:number; ph:number; olr:number;
@@ -16,7 +16,7 @@ type Recommendation = {
 type Prediction = {
   biogas:number; methane:number; electricity:number; bestSetpoints:Omit<Inputs,"feedstock">;
   recommendations:Recommendation[]; baseline:PlantOutput; optimized:PlantOutput;
-  modelName:string; modelVersion:string; modelFit:string; outOfRange:boolean;
+  modelName:string; modelVersion:string; modelFit:string; outOfRange:boolean; extrapolatedInputs?:string[];
   runId:string; createdAt:string; agentMessage:string;
   audit:{saved:boolean;status:string};
 };
@@ -31,16 +31,6 @@ type AdminSettings = {
 const initial:Inputs = {
   feedstock:"Dairy WW", feedRate:846, temperature:35, ph:7.1, olr:3.5,
   hrt:22, codIn:7000, vfa:1100, mixing:50,
-};
-const bounds:Record<Exclude<keyof Inputs,"feedstock">,{min:number;max:number;label:string;unit:string}> = {
-  feedRate:{min:820,max:870,label:"Feed rate",unit:"kg VS/day"},
-  temperature:{min:34.08,max:38.87,label:"Temperature",unit:"°C"},
-  ph:{min:6.82,max:7.58,label:"pH",unit:""},
-  olr:{min:1.55,max:6.38,label:"Organic loading",unit:"kg COD/m³/day"},
-  hrt:{min:15.45,max:34.62,label:"Retention time",unit:"days"},
-  codIn:{min:3205,max:11864,label:"COD input",unit:"mg/L"},
-  vfa:{min:251,max:2963,label:"VFA",unit:"mg/L"},
-  mixing:{min:20,max:79,label:"Mixer speed",unit:"RPM"},
 };
 const outputs:Record<OutputKey,{label:string;unit:string;icon:string;color:string;before:(p:Prediction)=>number;after:(p:Prediction)=>number}> = {
   biogas:{label:"Biogas",unit:"m³/day",icon:"◒",color:"#1187f5",before:p=>p.baseline.biogas,after:p=>p.optimized.biogas},
@@ -78,7 +68,6 @@ export default function Home(){
 
   useEffect(()=>{void (async()=>{try{const response=await fetch("/api/auth/session",{cache:"no-store"});if(response.ok)setAuth((await response.json()).user);}finally{setChecking(false);}})();},[]);
 
-  const issues=useMemo(()=>Object.entries(bounds).filter(([key,b])=>{const value=inputs[key as keyof typeof bounds];return !Number.isFinite(value)||value<b.min||value>b.max;}),[inputs]);
   const dirty=Boolean(result&&lastRunInputs&&JSON.stringify(inputs)!==JSON.stringify(lastRunInputs));
 
   const update=(key:keyof Inputs,value:string)=>setInputs(current=>({...current,[key]:key==="feedstock"?value:Number(value)}));
@@ -93,7 +82,6 @@ export default function Home(){
   async function logout(){await fetch("/api/auth/logout",{method:"POST"});setAuth(null);setResult(null);setRuns([]);setSettingsOpen(false);}
 
   async function predict(){
-    if(issues.length)return;
     setLoading(true);setPredictionError("");
     try{
       const previousRun=result&&lastRunInputs?{prediction:result,inputs:lastRunInputs}:null;
@@ -155,25 +143,25 @@ export default function Home(){
       <div className="truth-strip"><b>Prototype calculation</b><span>The normal dashboard uses the supplied day-scale scenario data. Hour-scale sheets are research projections and are not mixed into this result.</span></div>
 
       <section className="input-panel" id="inputs">
-        <div className="section-heading"><div><small>STEP 1</small><h2>Tell us what is entering the digester</h2><p>Every field below is used by the calculation.</p></div><span className={issues.length?"needs-review":"inside-range"}>{issues.length?"Check highlighted values":"Inside supported range"}</span></div>
+        <div className="section-heading"><div><small>STEP 1</small><h2>Tell us what is entering the digester</h2><p>Every field below is used by the calculation.</p></div><span className="inside-range">Manual calculation</span></div>
         <div className="input-grid primary-inputs">
           <Field label="Feedstock" value={inputs.feedstock} onChange={value=>update("feedstock",value)} options={["Dairy WW","Cow Manure","Food Waste","Paper Mill","Brewery","Mixed Waste"]}/>
-          <Field label="Feed rate" value={inputs.feedRate} unit="kg VS/day" min={bounds.feedRate.min} max={bounds.feedRate.max} onChange={value=>update("feedRate",value)}/>
-          <Field label="Temperature" value={inputs.temperature} unit="°C" min={bounds.temperature.min} max={bounds.temperature.max} onChange={value=>update("temperature",value)} step="0.1"/>
-          <Field label="pH" value={inputs.ph} min={bounds.ph.min} max={bounds.ph.max} onChange={value=>update("ph",value)} step="0.01"/>
-          <Field label="Retention time" value={inputs.hrt} unit="days" min={bounds.hrt.min} max={bounds.hrt.max} onChange={value=>update("hrt",value)} step="0.1"/>
+          <Field label="Feed rate" value={inputs.feedRate} unit="kg VS/day" onChange={value=>update("feedRate",value)}/>
+          <Field label="Temperature" value={inputs.temperature} unit="°C" onChange={value=>update("temperature",value)} step="0.1"/>
+          <Field label="pH" value={inputs.ph} onChange={value=>update("ph",value)} step="0.01"/>
+          <Field label="Retention time" value={inputs.hrt} unit="days" onChange={value=>update("hrt",value)} step="0.1"/>
         </div>
         <button className="more-inputs" onClick={()=>setAdvanced(value=>!value)}>{advanced?"Hide":"Show"} four more inputs <span>{advanced?"−":"+"}</span></button>
         {advanced&&<div className="input-grid advanced-inputs">
-          <Field label="Organic loading" value={inputs.olr} unit="kg COD/m³/day" min={bounds.olr.min} max={bounds.olr.max} onChange={value=>update("olr",value)} step="0.1"/>
-          <Field label="COD input" value={inputs.codIn} unit="mg/L" min={bounds.codIn.min} max={bounds.codIn.max} onChange={value=>update("codIn",value)}/>
-          <Field label="VFA" value={inputs.vfa} unit="mg/L" min={bounds.vfa.min} max={bounds.vfa.max} onChange={value=>update("vfa",value)}/>
-          <Field label="Mixer speed" value={inputs.mixing} unit="RPM" min={bounds.mixing.min} max={bounds.mixing.max} onChange={value=>update("mixing",value)}/>
+          <Field label="Organic loading" value={inputs.olr} unit="kg COD/m³/day" onChange={value=>update("olr",value)} step="0.1"/>
+          <Field label="COD input" value={inputs.codIn} unit="mg/L" onChange={value=>update("codIn",value)}/>
+          <Field label="VFA" value={inputs.vfa} unit="mg/L" onChange={value=>update("vfa",value)}/>
+          <Field label="Mixer speed" value={inputs.mixing} unit="RPM" onChange={value=>update("mixing",value)}/>
         </div>}
-        {issues.length>0&&<div className="input-warning"><b>These values are outside the normal model range:</b> {issues.map(([,value])=>value.label).join(", ")}.</div>}
         {dirty&&<div className="dirty-note">Inputs changed. Run the calculation again to refresh every result.</div>}
         {predictionError&&<div className="input-warning">{predictionError}</div>}
-        <button className="calculate-button" disabled={loading||issues.length>0} onClick={()=>void predict()}>{loading?<><i className="loader"/>AI is comparing your inputs…</>:"Calculate production →"}</button>
+        <div className="extrapolation-note">Values beyond the supplied rows are estimated from the nearest data patterns. Nothing runs until you click Calculate.</div>
+        <button className="calculate-button" disabled={loading} onClick={()=>void predict()}>{loading?<><i className="loader"/>AI is comparing your inputs…</>:"Calculate production →"}</button>
       </section>
 
       <section className="results-section" aria-live="polite">
@@ -209,9 +197,8 @@ function LoginScreen({username,password,error,busy,onUsername,onPassword,onSubmi
   return <main className="login-page"><section className="login-story"><div className="simple-brand light"><span>◒</span><b>AQUAIVOLT<small>WASTE TO ENERGY</small></b></div><div><small>AI BIOGAS PLATFORM</small><h1>Simple plant inputs.<br/>Clear production results.</h1><p>Compare biogas, methane and electricity before and after model optimization.</p></div><em>Synthetic scenario prototype • Human approval required</em></section><section className="login-form-wrap"><form onSubmit={onSubmit}><span className="login-icon">✦</span><small>SECURE ACCESS</small><h2>Sign in</h2><p>Use your Aquaivolt admin or user account.</p><label><span>Username</span><input value={username} onChange={event=>onUsername(event.target.value)} autoComplete="username" required/></label><label><span>Password</span><input type="password" value={password} onChange={event=>onPassword(event.target.value)} autoComplete="current-password" required/></label>{error&&<div className="login-error">{error}</div>}<button disabled={busy}>{busy?"Checking…":"Continue →"}</button></form></section></main>;
 }
 
-function Field({label,value,unit,onChange,options,min,max,step}:{label:string;value:string|number;unit?:string;onChange:(v:string)=>void;options?:string[];min?:number;max?:number;step?:string}){
-  const numeric=Number(value);const invalid=!options&&min!==undefined&&max!==undefined&&(!Number.isFinite(numeric)||numeric<min||numeric>max);
-  return <label className={`simple-field ${invalid?"invalid":""}`}><span>{label}{min!==undefined&&max!==undefined&&<small>{min} – {max}</small>}</span><div>{options?<select value={value} onChange={event=>onChange(event.target.value)}>{options.map(option=><option key={option}>{option}</option>)}</select>:<input type="number" step={step||"any"} value={value} onChange={event=>onChange(event.target.value)}/>} {unit&&<em>{unit}</em>}</div></label>;
+function Field({label,value,unit,onChange,options,step}:{label:string;value:string|number;unit?:string;onChange:(v:string)=>void;options?:string[];step?:string}){
+  return <label className="simple-field"><span>{label}</span><div>{options?<select value={value} onChange={event=>onChange(event.target.value)}>{options.map(option=><option key={option}>{option}</option>)}</select>:<input type="number" step={step||"any"} value={value} onChange={event=>onChange(event.target.value)}/>} {unit&&<em>{unit}</em>}</div></label>;
 }
 
 function OutputCard({outputKey,result,active,onClick}:{outputKey:OutputKey;result:Prediction|null;active:boolean;onClick:()=>void}){
@@ -221,7 +208,7 @@ function OutputCard({outputKey,result,active,onClick}:{outputKey:OutputKey;resul
 
 function Comparison({outputKey,result}:{outputKey:OutputKey;result:Prediction}){
   const meta=outputs[outputKey];const before=meta.before(result);const after=meta.after(result);const extra=after-before;const max=Math.max(before,after)*1.08;
-  return <><div className="comparison-head"><div><small>CURRENT CALCULATION</small><h2>{meta.label}: before and after</h2><p>A longer coloured bar means more production.</p></div><span className="coverage-word">{result.outOfRange?"Input needs review":"Supported input range"}</span></div><div className="comparison-layout"><div className="big-bars"><div className="bar-row"><span>Before AI</span><div><i className="before" style={{width:`${before/max*100}%`}}/></div><b>{format(before)}<small>{meta.unit}</small></b></div><div className="bar-row"><span>After AI</span><div><i className="after" style={{width:`${after/max*100}%`,background:meta.color}}/></div><b>{format(after)}<small>{meta.unit}</small></b></div><div className="extra-callout"><span>Extra {meta.label.toLowerCase()}</span><b>+{format(extra)} <small>{meta.unit}</small></b><p>This is the direct difference between the two bars.</p></div></div><div className="recommendation-box"><small>WHAT TO DO NEXT</small><h3>{result.recommendations[0]?.title||"Keep the current inputs"}</h3><p>{result.recommendations[0]?.detail||"The current scenario is close to the supplied reference case."}</p>{result.recommendations[0]&&<div><span>{result.recommendations[0].parameter}</span><b>{format(result.recommendations[0].current)} {result.recommendations[0].unit}</b><i>→</i><b>{format(result.recommendations[0].target)} {result.recommendations[0].unit}</b></div>}<em>Review with the plant operator before changing equipment.</em></div></div></>;
+  return <><div className="comparison-head"><div><small>CURRENT CALCULATION</small><h2>{meta.label}: before and after</h2><p>A longer coloured bar means more production.</p></div><span className="coverage-word">{result.outOfRange?"Estimated from nearest pattern":"Matched to supplied patterns"}</span></div><div className="comparison-layout"><div className="big-bars"><div className="bar-row"><span>Before AI</span><div><i className="before" style={{width:`${before/max*100}%`}}/></div><b>{format(before)}<small>{meta.unit}</small></b></div><div className="bar-row"><span>After AI</span><div><i className="after" style={{width:`${after/max*100}%`,background:meta.color}}/></div><b>{format(after)}<small>{meta.unit}</small></b></div><div className="extra-callout"><span>Extra {meta.label.toLowerCase()}</span><b>+{format(extra)} <small>{meta.unit}</small></b><p>This is the direct difference between the two bars.</p></div></div><div className="recommendation-box"><small>WHAT TO DO NEXT</small><h3>{result.recommendations[0]?.title||"Keep the current inputs"}</h3><p>{result.recommendations[0]?.detail||"The current scenario is close to the supplied reference case."}</p>{result.recommendations[0]&&<div><span>{result.recommendations[0].parameter}</span><b>{format(result.recommendations[0].current)} {result.recommendations[0].unit}</b><i>→</i><b>{format(result.recommendations[0].target)} {result.recommendations[0].unit}</b></div>}<em>Review with the plant operator before changing equipment.</em></div></div></>;
 }
 
 function ValidationChart({outputKey}:{outputKey:OutputKey}){
