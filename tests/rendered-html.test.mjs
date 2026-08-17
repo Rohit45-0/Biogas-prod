@@ -34,11 +34,10 @@ test("builds the simplified before-and-after production dashboard", async () => 
   await access(new URL("app/api/model/route.ts", root));
 });
 
-test("packages the server, social card, hosting metadata, and D1 migration", async () => {
+test("packages the Vercel-compatible Next.js application and social card", async () => {
   await Promise.all([
-    access(new URL("dist/server/index.js", root)),
-    access(new URL("dist/.openai/hosting.json", root)),
-    access(new URL("dist/.openai/drizzle/0000_loose_infant_terrible.sql", root)),
+    access(new URL(".next/BUILD_ID", root)),
+    access(new URL(".next/server/app/page.js", root)),
     access(new URL("public/og.png", root)),
   ]);
 });
