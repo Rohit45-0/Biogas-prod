@@ -1,0 +1,268 @@
+{
+  "run_id": "f44bc6f9-172f-4a71-b382-37d4b94a7d9e",
+  "started_at": "2026-08-20T04:08:32.065034+00:00",
+  "completed_at": "2026-08-20T04:08:32.324208+00:00",
+  "workflow": "Aquaivolt LangGraph technical demonstration",
+  "framework_versions": {
+    "python": "3.12.13",
+    "langgraph": "1.2.11",
+    "scikit_learn": "1.9.0",
+    "joblib": "1.5.3"
+  },
+  "input": {
+    "feedstock": "Dairy WW",
+    "feedRate": 820.0,
+    "temperature": 35.0,
+    "ph": 7.1,
+    "olr": 3.5,
+    "hrt": 22.0,
+    "codIn": 7000.0,
+    "vfa": 1000.0,
+    "mixing": 50.0
+  },
+  "feature_contract": {
+    "anchor_model_features": [
+      "feedstock",
+      "temperature",
+      "ph",
+      "olr",
+      "hrt",
+      "codIn"
+    ],
+    "scada_model_features": [
+      "feedstock",
+      "hrt",
+      "olr",
+      "temperature",
+      "ph",
+      "codIn",
+      "vfa",
+      "mixing"
+    ],
+    "context_only_for_anchor_model": [
+      "feedRate",
+      "vfa",
+      "mixing"
+    ],
+    "note": "The saved Gradient Boosting anchor model was trained on six features. Feed rate, VFA and mixing are preserved in the audit request but are not silently injected into that model."
+  },
+  "model_registry": {
+    "gradient_boosting_anchor": {
+      "artifact": "ai-workflow/models/best_10_anchor_model.joblib",
+      "sha256": "f705f5c4b2a29870640e425ebd3ef7fcf9cb0cff2923e64ebd5f45bf0433f7a4",
+      "framework": "scikit-learn 1.9.0",
+      "evaluation": {
+        "Gas Flow (m3/h) After AI": {
+          "MAE": 9.580741615985056,
+          "RMSE": 12.498821316780761,
+          "R2": 0.5127396702884716
+        },
+        "CH4 (%) After AI": {
+          "MAE": 1.3813286618447436,
+          "RMSE": 1.5372203781889429,
+          "R2": 0.3846233096043342
+        },
+        "Generator (kW) After AI": {
+          "MAE": 3.941674141950366,
+          "RMSE": 4.915750142943742,
+          "R2": 0.4332880049753419
+        },
+        "overall_normalized_MAE": 0.6145360455228502
+      }
+    },
+    "ridge_scada": {
+      "artifact": "ai-workflow/models/best_scada_tabular_model.joblib",
+      "sha256": "f4bd3000d2b9f394c2dfb3dcec64252f95cdb69a39f2164f83fd838fc6b8228e",
+      "framework": "scikit-learn 1.9.0",
+      "evaluation": {
+        "Gas_Flow_m3h": {
+          "MAE": 91.85007276477012,
+          "RMSE": 107.51525289061773,
+          "R2": -0.01584712125472132
+        },
+        "CH4_pct": {
+          "MAE": 4.079243256003361,
+          "RMSE": 4.718828354308548,
+          "R2": 0.005509374039200043
+        },
+        "Generator_kW": {
+          "MAE": 24.905344779290758,
+          "RMSE": 28.467896149126748,
+          "R2": -0.01690489033620768
+        },
+        "overall_normalized_MAE": 0.8348201719190088
+      }
+    },
+    "small_neural_network": {
+      "artifact": null,
+      "framework": "scikit-learn MLPRegressor candidate; not PyTorch",
+      "selection_status": "rejected because holdout/leave-one-out performance was poor",
+      "evaluation": {
+        "Gas Flow (m3/h) After AI": {
+          "MAE": 51.23715420253203,
+          "RMSE": 59.078929075393724,
+          "R2": -9.88649717942485
+        },
+        "CH4 (%) After AI": {
+          "MAE": 23.243331614117064,
+          "RMSE": 26.38433052759158,
+          "R2": -180.28460869510445
+        },
+        "Generator (kW) After AI": {
+          "MAE": 20.53504271989446,
+          "RMSE": 22.669291238875505,
+          "R2": -11.051987928540285
+        },
+        "overall_normalized_MAE": 5.955862441859904
+      }
+    }
+  },
+  "candidate_predictions": {
+    "gradient_boosting_anchor": {
+      "gas_flow_m3h": 138.2708,
+      "methane_pct": 65.005,
+      "generator_kw": 49.1256
+    },
+    "ridge_scada": {
+      "gas_flow_m3h": 210.2852,
+      "methane_pct": 62.9123,
+      "generator_kw": 66.2511
+    }
+  },
+  "selected_model": "gradient_boosting_anchor",
+  "selected_prediction": {
+    "gas_flow_m3h": 138.2708,
+    "methane_pct": 65.005,
+    "generator_kw": 49.1256
+  },
+  "metrics": {
+    "gas_flow_m3h": 138.27,
+    "biogas_m3_day": 3318.5,
+    "methane_pct": 65.0,
+    "methane_m3_day": 2157.19,
+    "generator_kw": 49.13,
+    "electricity_kwh_day": 1179.01,
+    "co2_pct_simplified": 35.0,
+    "carbon_avoided_t_day_estimate": 0.8347
+  },
+  "recommendation": {
+    "searched_candidates": 400,
+    "recommended_setpoints": {
+      "temperature": 36.5,
+      "ph": 7.25,
+      "olr": 3.7,
+      "hrt": 19.0
+    },
+    "predicted_biogas_m3_day": 4060.13,
+    "predicted_methane_pct": 65.73,
+    "predicted_electricity_kwh_day": 1439.4,
+    "biogas_delta_m3_day": 741.63,
+    "operator_approval_required": true
+  },
+  "safeguards": [
+    {
+      "check": "Methane quality",
+      "value": 65.0,
+      "rule": ">= 55%",
+      "status": "pass"
+    },
+    {
+      "check": "Recommendation authority",
+      "value": "advisory",
+      "rule": "no automatic equipment control",
+      "status": "pass"
+    },
+    {
+      "check": "Evidence scope",
+      "value": "research-informed synthetic/projection inputs",
+      "rule": "do not claim plant validation",
+      "status": "pass"
+    }
+  ],
+  "explanation": "The selected Gradient Boosting pipeline predicts 3318.5 m3/day biogas, 65.0% methane and 1179.0 kWh/day. The optimizer tested 400 nearby scenarios and recommends temperature 36.5 C, pH 7.25, OLR 3.70, and HRT 19.0 days. This is advisory prototype evidence and requires operator review.",
+  "error": null,
+  "trace": [
+    {
+      "sequence": 1,
+      "node": "Input Agent",
+      "tool": "Schema + physical-bound validator",
+      "status": "complete",
+      "detail": "9 fields validated",
+      "elapsed_ms": 0.01,
+      "timestamp": "2026-08-20T04:08:32.065034+00:00"
+    },
+    {
+      "sequence": 2,
+      "node": "Feature Agent",
+      "tool": "pandas feature frames",
+      "status": "complete",
+      "detail": "Built Gradient and SCADA feature frames for Dairy WW",
+      "elapsed_ms": 0.0,
+      "timestamp": "2026-08-20T04:08:32.065034+00:00"
+    },
+    {
+      "sequence": 3,
+      "node": "Model Registry Agent",
+      "tool": "joblib + SHA-256 verifier",
+      "status": "complete",
+      "detail": "2 saved pipelines loaded and hashed; neural candidate marked rejected",
+      "elapsed_ms": 208.65,
+      "timestamp": "2026-08-20T04:08:32.279001+00:00"
+    },
+    {
+      "sequence": 4,
+      "node": "Parallel Model Workers",
+      "tool": "Gradient Boosting + Ridge predict()",
+      "status": "complete",
+      "detail": "Both saved pipelines executed on the submitted scenario",
+      "elapsed_ms": 39.81,
+      "timestamp": "2026-08-20T04:08:32.316281+00:00"
+    },
+    {
+      "sequence": 5,
+      "node": "Model Selection Agent",
+      "tool": "evaluation-metric policy",
+      "status": "complete",
+      "detail": "Selected Gradient Boosting: anchor leave-one-out normalized MAE 0.615; MLP candidate rejected",
+      "elapsed_ms": 0.0,
+      "timestamp": "2026-08-20T04:08:32.316281+00:00"
+    },
+    {
+      "sequence": 6,
+      "node": "KPI Agent",
+      "tool": "unit conversion + mass-balance formulas",
+      "status": "complete",
+      "detail": "Derived 8 report metrics from model outputs",
+      "elapsed_ms": 0.01,
+      "timestamp": "2026-08-20T04:08:32.316281+00:00"
+    },
+    {
+      "sequence": 7,
+      "node": "Optimization Agent",
+      "tool": "bounded grid search",
+      "status": "complete",
+      "detail": "Evaluated 400 model-backed setpoint candidates",
+      "elapsed_ms": 6.29,
+      "timestamp": "2026-08-20T04:08:32.324208+00:00"
+    },
+    {
+      "sequence": 8,
+      "node": "Safety + Explanation Agent",
+      "tool": "rule engine + deterministic template",
+      "status": "complete",
+      "detail": "Safeguards checked and operator-facing explanation assembled",
+      "elapsed_ms": 0.01,
+      "timestamp": "2026-08-20T04:08:32.324208+00:00"
+    },
+    {
+      "sequence": 9,
+      "node": "Audit Agent",
+      "tool": "JSON evidence writer",
+      "status": "complete",
+      "detail": "Immutable-style run evidence written to latest_run.json",
+      "elapsed_ms": 36.78,
+      "timestamp": "2026-08-20T04:08:32.360674+00:00"
+    }
+  ],
+  "truth_statement": "This JSON was created by executing the saved scikit-learn artifacts through a real LangGraph workflow. The deployed Vercel application currently uses a separate TypeScript scenario ensemble."
+}

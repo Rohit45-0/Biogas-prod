@@ -1,0 +1,12 @@
+node_modules
+.next
+.vinext
+.wrangler
+dist
+outputs
+work
+.git
+.env*
+examples
+worker
+vite.config.ts

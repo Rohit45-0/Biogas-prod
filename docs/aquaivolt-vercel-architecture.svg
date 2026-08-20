@@ -1,0 +1,330 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1700" viewBox="0 0 2400 1700" role="img" aria-labelledby="title desc">
+  <title id="title">Aquaivolt AI Command Center current Vercel architecture and LangGraph integration path</title>
+  <desc id="desc">A technical architecture diagram separating the currently deployed Next.js Vercel application from the executable standalone LangGraph proof.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset="1" stop-color="#eef5fb"/>
+    </linearGradient>
+    <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06234b"/>
+      <stop offset="1" stop-color="#0b3970"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#087ff5"/>
+      <stop offset="1" stop-color="#0b63d7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#072b54" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#1685ef"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#10a993"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#e69b21"/>
+    </marker>
+    <style>
+      .title{font:700 46px 'Segoe UI',Arial,sans-serif;fill:#082851;letter-spacing:-1px}
+      .subtitle{font:400 22px 'Segoe UI',Arial,sans-serif;fill:#58708d}
+      .section{font:700 18px 'Segoe UI',Arial,sans-serif;fill:#15436f;letter-spacing:2px}
+      .section-light{font:700 18px 'Segoe UI',Arial,sans-serif;fill:#dbeeff;letter-spacing:2px}
+      .h1{font:700 24px 'Segoe UI',Arial,sans-serif;fill:#0b2e55}
+      .h1-light{font:700 24px 'Segoe UI',Arial,sans-serif;fill:#ffffff}
+      .h2{font:700 19px 'Segoe UI',Arial,sans-serif;fill:#11375e}
+      .body{font:400 16px 'Segoe UI',Arial,sans-serif;fill:#506984}
+      .body-dark{font:500 16px 'Segoe UI',Arial,sans-serif;fill:#244765}
+      .small{font:400 14px 'Segoe UI',Arial,sans-serif;fill:#667f98}
+      .tiny{font:600 12px 'Segoe UI',Arial,sans-serif;fill:#65809b;letter-spacing:.4px}
+      .mono{font:600 14px Consolas,'Courier New',monospace;fill:#28618d}
+      .node{fill:#ffffff;stroke:#cfdeec;stroke-width:2;rx:18;filter:url(#shadow)}
+      .node-blue{fill:#edf7ff;stroke:#8bc5f6;stroke-width:2;rx:18}
+      .node-teal{fill:#ecfbf7;stroke:#8ed9cc;stroke-width:2;rx:18}
+      .node-purple{fill:#f5f1ff;stroke:#c9b6f3;stroke-width:2;rx:18}
+      .node-amber{fill:#fff8ea;stroke:#f0c676;stroke-width:2;rx:18}
+      .arrow{fill:none;stroke:#1685ef;stroke-width:4;marker-end:url(#arrow-blue)}
+      .arrow-thin{fill:none;stroke:#1685ef;stroke-width:3;marker-end:url(#arrow-blue)}
+      .arrow-teal{fill:none;stroke:#10a993;stroke-width:3;marker-end:url(#arrow-teal)}
+      .arrow-plan{fill:none;stroke:#e69b21;stroke-width:4;stroke-dasharray:12 10;marker-end:url(#arrow-amber)}
+      .arrow-future{fill:none;stroke:#91a5b8;stroke-width:3;stroke-dasharray:9 8;marker-end:url(#arrow-blue)}
+      .pill{font:700 12px 'Segoe UI',Arial,sans-serif;letter-spacing:1px}
+      .icon{font:700 25px 'Segoe UI Symbol','Segoe UI',Arial,sans-serif;text-anchor:middle;dominant-baseline:middle}
+    </style>
+  </defs>
+
+  <rect width="2400" height="1700" fill="url(#bg)"/>
+  <path d="M0 0H2400V12H0Z" fill="#19bdd1"/>
+
+  <g transform="translate(82 70)">
+    <path d="M0 24C14 4 35 0 55 6C45 18 39 31 43 45C32 39 22 28 18 18C15 34 20 49 35 62C19 63 6 55 1 43C-2 36-2 30 0 24Z" fill="#19bfd0"/>
+    <text x="78" y="36" class="title">AQUAIVOLT AI COMMAND CENTER</text>
+    <text x="78" y="74" class="subtitle">Current Vercel deployment, prediction workflow, RAG services and LangGraph integration path</text>
+  </g>
+
+  <g transform="translate(1570 50)">
+    <rect x="0" y="0" width="730" height="82" rx="18" fill="#ffffff" stroke="#d7e4ef"/>
+    <line x1="28" y1="25" x2="80" y2="25" stroke="#1685ef" stroke-width="5" marker-end="url(#arrow-blue)"/>
+    <text x="96" y="31" class="small">Currently deployed</text>
+    <line x1="270" y1="25" x2="322" y2="25" stroke="#e69b21" stroke-width="5" stroke-dasharray="10 8" marker-end="url(#arrow-amber)"/>
+    <text x="338" y="31" class="small">Technical proof / next integration</text>
+    <line x1="28" y1="57" x2="80" y2="57" stroke="#91a5b8" stroke-width="4" stroke-dasharray="8 7"/>
+    <text x="96" y="63" class="small">Future or non-durable component</text>
+  </g>
+
+  <!-- Actors -->
+  <g>
+    <rect x="60" y="190" width="300" height="1070" rx="28" fill="#ffffff" stroke="#d6e3ee" stroke-width="2"/>
+    <text x="92" y="235" class="section">USERS &amp; INPUTS</text>
+
+    <rect x="88" y="275" width="244" height="150" class="node-blue"/>
+    <circle cx="132" cy="325" r="24" fill="#1685ef"/>
+    <text x="132" y="326" class="icon" fill="#ffffff">U</text>
+    <text x="172" y="318" class="h2">Plant operator</text>
+    <text x="172" y="345" class="small">Manual calculation</text>
+    <text x="110" y="387" class="body">Runs scenarios and reviews</text>
+    <text x="110" y="410" class="body">recommendations.</text>
+
+    <rect x="88" y="465" width="244" height="150" class="node-purple"/>
+    <circle cx="132" cy="515" r="24" fill="#7454d8"/>
+    <text x="132" y="516" class="icon" fill="#ffffff">A</text>
+    <text x="172" y="508" class="h2">Administrator</text>
+    <text x="172" y="535" class="small">Evidence and settings</text>
+    <text x="110" y="577" class="body">Views audit, evaluation,</text>
+    <text x="110" y="600" class="body">model and thresholds.</text>
+
+    <rect x="88" y="655" width="244" height="150" rx="18" fill="#f6f8fa" stroke="#9dafbf" stroke-width="2" stroke-dasharray="9 7"/>
+    <circle cx="132" cy="705" r="24" fill="#8da0b3"/>
+    <text x="132" y="706" class="icon" fill="#ffffff">I</text>
+    <text x="172" y="698" class="h2">Future IoT/SCADA</text>
+    <text x="172" y="725" class="small">Not connected today</text>
+    <text x="110" y="767" class="body">Will replace manual entry</text>
+    <text x="110" y="790" class="body">with sensor telemetry.</text>
+
+    <rect x="88" y="855" width="244" height="315" rx="18" fill="#f9fcff" stroke="#cfdeec" stroke-width="2"/>
+    <text x="112" y="895" class="tiny">NINE MODEL INPUTS</text>
+    <text x="112" y="934" class="body-dark">01  Feedstock type</text>
+    <text x="112" y="968" class="body-dark">02  Feed rate</text>
+    <text x="112" y="1002" class="body-dark">03  Temperature</text>
+    <text x="112" y="1036" class="body-dark">04  pH</text>
+    <text x="112" y="1070" class="body-dark">05  Organic loading</text>
+    <text x="112" y="1104" class="body-dark">06  Retention time</text>
+    <text x="112" y="1138" class="body-dark">07  COD  ·  08 VFA  ·  09 RPM</text>
+  </g>
+
+  <!-- Current Vercel deployment -->
+  <g>
+    <rect x="400" y="190" width="1370" height="1070" rx="30" fill="#f9fcff" stroke="#1685ef" stroke-width="3"/>
+    <rect x="400" y="190" width="1370" height="60" rx="28" fill="url(#navy)"/>
+    <rect x="400" y="225" width="1370" height="25" fill="url(#navy)"/>
+    <text x="438" y="229" class="section-light">VERCEL DEPLOYMENT · CURRENT PRODUCTION PROTOTYPE</text>
+    <rect x="1510" y="205" width="220" height="30" rx="15" fill="#0cbf96"/>
+    <text x="1620" y="225" text-anchor="middle" class="pill" fill="#ffffff">DEPLOYED · HTTPS</text>
+
+    <rect x="470" y="282" width="1230" height="100" rx="20" fill="#eaf5ff" stroke="#9dccf3" stroke-width="2"/>
+    <circle cx="524" cy="332" r="25" fill="#1685ef"/>
+    <text x="524" y="333" class="icon" fill="#ffffff">V</text>
+    <text x="565" y="324" class="h2">Vercel Edge Network</text>
+    <text x="565" y="351" class="body">Public URL · TLS · CDN delivery · routes browser requests to Next.js functions</text>
+    <rect x="1400" y="307" width="250" height="48" rx="12" fill="#ffffff" stroke="#b8d3e9"/>
+    <text x="1525" y="336" text-anchor="middle" class="mono">aquaivolt-command-center</text>
+
+    <rect x="470" y="420" width="1230" height="170" rx="20" fill="#ffffff" stroke="#cbddeb" stroke-width="2" filter="url(#shadow)"/>
+    <text x="500" y="458" class="tiny">NEXT.JS 16 + REACT 19 WEB APPLICATION</text>
+    <rect x="500" y="480" width="265" height="78" rx="14" fill="#eff7ff" stroke="#b7d8f4"/>
+    <text x="520" y="510" class="h2">Login &amp; role UI</text>
+    <text x="520" y="536" class="small">Admin / user session</text>
+    <rect x="790" y="480" width="265" height="78" rx="14" fill="#eff7ff" stroke="#b7d8f4"/>
+    <text x="810" y="510" class="h2">Plant input form</text>
+    <text x="810" y="536" class="small">Nine manual parameters</text>
+    <rect x="1080" y="480" width="265" height="78" rx="14" fill="#eff7ff" stroke="#b7d8f4"/>
+    <text x="1100" y="510" class="h2">Dynamic results</text>
+    <text x="1100" y="536" class="small">Outputs, charts, monitoring</text>
+    <rect x="1370" y="480" width="295" height="78" rx="14" fill="#eff7ff" stroke="#b7d8f4"/>
+    <text x="1390" y="510" class="h2">Visible workflow evidence</text>
+    <text x="1390" y="536" class="small">Execution nodes and trace</text>
+
+    <rect x="470" y="628" width="1230" height="205" rx="20" fill="#f5f9fd" stroke="#cbddeb" stroke-width="2"/>
+    <text x="500" y="665" class="tiny">AUTHENTICATED VERCEL SERVERLESS API ROUTES</text>
+    <rect x="500" y="690" width="270" height="105" rx="14" class="node-blue"/>
+    <text x="520" y="725" class="h2">Prediction API</text>
+    <text x="520" y="752" class="mono">POST /api/predict</text>
+    <text x="520" y="778" class="small">Runs deterministic inference</text>
+    <rect x="790" y="690" width="270" height="105" rx="14" class="node-teal"/>
+    <text x="810" y="725" class="h2">Copilot + RAG API</text>
+    <text x="810" y="752" class="mono">POST /api/copilot</text>
+    <text x="810" y="778" class="small">Semantic or keyword retrieval</text>
+    <rect x="1080" y="690" width="290" height="105" rx="14" class="node-purple"/>
+    <text x="1100" y="725" class="h2">Admin evidence APIs</text>
+    <text x="1100" y="752" class="mono">audit · model · evaluation</text>
+    <text x="1100" y="778" class="small">settings · health</text>
+    <rect x="1390" y="690" width="275" height="105" rx="14" fill="#ffffff" stroke="#c8d9e8" stroke-width="2"/>
+    <text x="1410" y="725" class="h2">Signed session</text>
+    <text x="1410" y="752" class="mono">HttpOnly HMAC cookie</text>
+    <text x="1410" y="778" class="small">Eight-hour role access</text>
+
+    <rect x="470" y="872" width="1230" height="330" rx="22" fill="#ffffff" stroke="#aacbe6" stroke-width="2" filter="url(#shadow)"/>
+    <text x="500" y="910" class="tiny">SERVER-SIDE TYPESCRIPT PREDICTION WORKFLOW · MODEL v1.5.0</text>
+
+    <rect x="500" y="955" width="190" height="105" rx="16" class="node-blue"/>
+    <circle cx="528" cy="983" r="15" fill="#1685ef"/>
+    <text x="528" y="984" class="pill" fill="#ffffff" text-anchor="middle">1</text>
+    <text x="552" y="990" class="h2">Validate</text>
+    <text x="520" y="1022" class="small">Auth, types, ranges</text>
+    <text x="520" y="1046" class="small">and feedstock mapping</text>
+
+    <rect x="730" y="955" width="220" height="105" rx="16" class="node-blue"/>
+    <circle cx="758" cy="983" r="15" fill="#1685ef"/>
+    <text x="758" y="984" class="pill" fill="#ffffff" text-anchor="middle">2</text>
+    <text x="782" y="990" class="h2">Infer scenario</text>
+    <text x="750" y="1022" class="small">Distance-weighted</text>
+    <text x="750" y="1046" class="small">10-anchor ensemble</text>
+
+    <rect x="990" y="955" width="210" height="105" rx="16" class="node-teal"/>
+    <circle cx="1018" cy="983" r="15" fill="#10a993"/>
+    <text x="1018" y="984" class="pill" fill="#ffffff" text-anchor="middle">3</text>
+    <text x="1042" y="990" class="h2">Derive KPIs</text>
+    <text x="1010" y="1022" class="small">Biogas, CH₄, CO₂, H₂S</text>
+    <text x="1010" y="1046" class="small">electricity and carbon</text>
+
+    <rect x="1240" y="955" width="210" height="105" rx="16" class="node-teal"/>
+    <circle cx="1268" cy="983" r="15" fill="#10a993"/>
+    <text x="1268" y="984" class="pill" fill="#ffffff" text-anchor="middle">4</text>
+    <text x="1292" y="990" class="h2">Optimize</text>
+    <text x="1260" y="1022" class="small">Re-run candidate</text>
+    <text x="1260" y="1046" class="small">setpoints and rank actions</text>
+
+    <rect x="1490" y="955" width="180" height="105" rx="16" class="node-purple"/>
+    <circle cx="1518" cy="983" r="15" fill="#7454d8"/>
+    <text x="1518" y="984" class="pill" fill="#ffffff" text-anchor="middle">5</text>
+    <text x="1542" y="990" class="h2">Evidence</text>
+    <text x="1510" y="1022" class="small">Run ID, sensitivity,</text>
+    <text x="1510" y="1046" class="small">trace and alerts</text>
+
+    <path d="M690 1007H730" class="arrow-thin"/>
+    <path d="M950 1007H990" class="arrow-thin"/>
+    <path d="M1200 1007H1240" class="arrow-teal"/>
+    <path d="M1450 1007H1490" class="arrow-teal"/>
+
+    <rect x="500" y="1093" width="1170" height="72" rx="14" fill="#082d5a"/>
+    <text x="525" y="1124" class="tiny" fill="#73dbe6">RETURNED TO THE DASHBOARD</text>
+    <text x="525" y="1150" class="body" fill="#ffffff">Biogas · methane · electricity · carbon · gas composition · dynamic charts · recommendations · workflow evidence</text>
+  </g>
+
+  <!-- External services and storage -->
+  <g>
+    <rect x="1810" y="190" width="530" height="1070" rx="28" fill="#ffffff" stroke="#d6e3ee" stroke-width="2"/>
+    <text x="1842" y="235" class="section">EXTERNAL SERVICES &amp; STATE</text>
+
+    <rect x="1840" y="282" width="470" height="145" class="node-amber"/>
+    <circle cx="1890" cy="330" r="24" fill="#e69b21"/>
+    <text x="1890" y="331" class="icon" fill="#ffffff">K</text>
+    <text x="1930" y="323" class="h2">Vercel environment secrets</text>
+    <text x="1930" y="350" class="small">Session key and passwords</text>
+    <text x="1865" y="389" class="mono">AQUA_SESSION_SECRET</text>
+    <text x="2065" y="389" class="mono">OPENAI_API_KEY</text>
+
+    <rect x="1840" y="470" width="470" height="180" class="node-teal"/>
+    <circle cx="1890" cy="520" r="24" fill="#10a993"/>
+    <text x="1890" y="521" class="icon" fill="#ffffff">AI</text>
+    <text x="1930" y="513" class="h2">OpenAI APIs</text>
+    <text x="1930" y="540" class="small">Used only by Aqua Copilot</text>
+    <text x="1865" y="579" class="body-dark">• text-embedding-3-small</text>
+    <text x="1865" y="608" class="body-dark">• Responses API language model</text>
+    <text x="1865" y="637" class="small">Keyword fallback if API is unavailable</text>
+
+    <rect x="1840" y="694" width="470" height="190" rx="18" fill="#f6f8fa" stroke="#9dafbf" stroke-width="2" stroke-dasharray="9 7"/>
+    <circle cx="1890" cy="744" r="24" fill="#8da0b3"/>
+    <text x="1890" y="745" class="icon" fill="#ffffff">M</text>
+    <text x="1930" y="737" class="h2">Prototype memory audit store</text>
+    <text x="1930" y="764" class="small">Current implementation</text>
+    <text x="1865" y="807" class="body-dark">Run evidence is held in server memory.</text>
+    <text x="1865" y="835" class="body-dark">It may reset across Vercel instances.</text>
+    <text x="1865" y="864" class="small">Not durable production storage</text>
+
+    <rect x="1840" y="928" width="470" height="190" rx="18" fill="#fff8ea" stroke="#e69b21" stroke-width="2" stroke-dasharray="10 8"/>
+    <circle cx="1890" cy="978" r="24" fill="#e69b21"/>
+    <text x="1890" y="979" class="icon" fill="#ffffff">DB</text>
+    <text x="1930" y="971" class="h2">Hosted PostgreSQL</text>
+    <text x="1930" y="998" class="small">Recommended production addition</text>
+    <text x="1865" y="1041" class="body-dark">Durable runs, settings, users,</text>
+    <text x="1865" y="1069" class="body-dark">model registry and audit history.</text>
+    <text x="1865" y="1098" class="small">Not connected today</text>
+
+    <rect x="1840" y="1150" width="470" height="75" rx="15" fill="#eef6fc" stroke="#c5d8e8"/>
+    <text x="1865" y="1181" class="tiny">DEPLOYMENT STATUS</text>
+    <text x="1865" y="1207" class="body-dark">Vercel app active · hardware control disabled</text>
+  </g>
+
+  <!-- Cross-system arrows -->
+  <path d="M332 350H470" class="arrow"/>
+  <path d="M332 540H420V335H470" class="arrow"/>
+  <path d="M332 730H390V735H500" class="arrow-future"/>
+  <text x="345" y="710" class="tiny">FUTURE SENSOR FEED</text>
+  <path d="M1085 382V420" class="arrow"/>
+  <path d="M1085 590V628" class="arrow"/>
+  <path d="M635 833V872" class="arrow"/>
+  <path d="M1060 742H1790V560H1840" class="arrow-teal"/>
+  <text x="1510" y="720" class="tiny">RAG REQUESTS</text>
+  <path d="M1525 690V410H1810" class="arrow-plan"/>
+  <text x="1540" y="397" class="tiny">SECURE RUNTIME CONFIG</text>
+  <path d="M1370 742H1778V790H1840" class="arrow-future"/>
+  <text x="1510" y="770" class="tiny">VOLATILE RUN RECORDS</text>
+
+  <!-- Standalone LangGraph technical proof -->
+  <g>
+    <rect x="60" y="1320" width="2280" height="300" rx="30" fill="#fffaf0" stroke="#e69b21" stroke-width="3" stroke-dasharray="14 10"/>
+    <text x="96" y="1363" class="section" fill="#9a6310">STANDALONE LANGGRAPH TECHNICAL PROOF · EXECUTABLE, BUT NOT YET CALLED BY VERCEL</text>
+    <rect x="1980" y="1338" width="320" height="34" rx="17" fill="#f2b84b"/>
+    <text x="2140" y="1361" class="pill" fill="#553500" text-anchor="middle">PYTHON AUDITOR DEMONSTRATION</text>
+
+    <rect x="95" y="1410" width="230" height="115" class="node-amber"/>
+    <text x="115" y="1445" class="h2">JSON request</text>
+    <text x="115" y="1473" class="small">Nine UI inputs</text>
+    <text x="115" y="1499" class="small">+ unique run ID</text>
+
+    <rect x="365" y="1410" width="260" height="115" class="node-amber"/>
+    <text x="385" y="1445" class="h2">LangGraph StateGraph</text>
+    <text x="385" y="1473" class="small">Validation and feature nodes</text>
+    <text x="385" y="1499" class="small">conditional error route</text>
+
+    <rect x="665" y="1410" width="300" height="115" class="node-amber"/>
+    <text x="685" y="1445" class="h2">Saved ML model workers</text>
+    <text x="685" y="1473" class="small">Gradient Boosting + Ridge</text>
+    <text x="685" y="1499" class="small">joblib artifact hashes</text>
+
+    <rect x="1005" y="1410" width="285" height="115" class="node-amber"/>
+    <text x="1025" y="1445" class="h2">Selection + KPIs</text>
+    <text x="1025" y="1473" class="small">Choose evaluated candidate</text>
+    <text x="1025" y="1499" class="small">derive daily outputs</text>
+
+    <rect x="1330" y="1410" width="290" height="115" class="node-amber"/>
+    <text x="1350" y="1445" class="h2">Optimization agent</text>
+    <text x="1350" y="1473" class="small">400 bounded model searches</text>
+    <text x="1350" y="1499" class="small">recommended scenario</text>
+
+    <rect x="1660" y="1410" width="280" height="115" class="node-amber"/>
+    <text x="1680" y="1445" class="h2">Safety + explanation</text>
+    <text x="1680" y="1473" class="small">Operator-facing guardrails</text>
+    <text x="1680" y="1499" class="small">and limitations</text>
+
+    <rect x="1980" y="1410" width="300" height="115" class="node-amber"/>
+    <text x="2000" y="1445" class="h2">Audit evidence</text>
+    <text x="2000" y="1473" class="small">Trace, inputs, outputs</text>
+    <text x="2000" y="1499" class="small">and reproducible JSON</text>
+
+    <path d="M325 1468H365" class="arrow-plan"/>
+    <path d="M625 1468H665" class="arrow-plan"/>
+    <path d="M965 1468H1005" class="arrow-plan"/>
+    <path d="M1290 1468H1330" class="arrow-plan"/>
+    <path d="M1620 1468H1660" class="arrow-plan"/>
+    <path d="M1940 1468H1980" class="arrow-plan"/>
+
+    <path d="M495 1410V1288H890V1202" class="arrow-plan"/>
+    <rect x="618" y="1268" width="405" height="38" rx="19" fill="#fff4d9" stroke="#e69b21"/>
+    <text x="820" y="1293" class="pill" fill="#8b5a0b" text-anchor="middle">NEXT: WIRE REAL GRAPH EVENTS INTO /api/predict</text>
+  </g>
+
+  <text x="60" y="1665" class="small">Architecture derived from the current application source. Solid blue/teal paths are deployed; amber dashed paths are executable proof or recommended integration; grey dashed items are future/non-durable.</text>
+</svg>
