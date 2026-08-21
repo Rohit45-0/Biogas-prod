@@ -6,6 +6,19 @@ This repository contains the Aquaivolt biogas dashboard, its server-side predict
 
 **Live dashboard:** [aquaivolt-command-center.vercel.app](https://aquaivolt-command-center.vercel.app/)
 
+## Client quick start (Windows)
+
+Install Git, Node.js 22 or newer, and Python 3.12. Then open PowerShell and run only these two commands:
+
+```powershell
+git clone https://github.com/Rohit45-0/Biogas-prod.git; cd Biogas-prod
+./START_AQUAIVOLT.bat
+```
+
+The first run opens `.env.local` in Notepad. Add `OPENAI_API_KEY` if semantic Copilot is needed, save, and close Notepad. The launcher then installs dependencies, executes the real saved-model/LangGraph proof, verifies repeatability, starts the dashboard, and opens [http://localhost:3000](http://localhost:3000).
+
+For screenshots, login details, troubleshooting, and nontechnical instructions, use **[CLIENT_QUICK_START.md](CLIENT_QUICK_START.md)**.
+
 ![Aquaivolt architecture](docs/aquaivolt-vercel-architecture.png)
 
 ## What happens when the user calculates production?
