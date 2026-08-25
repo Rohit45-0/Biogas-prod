@@ -55,7 +55,7 @@ if not exist "node_modules" (
 echo.
 echo Starting the local AQUAIVOLT dashboard...
 echo Keep the new server window open while using the application.
-start "AQUAIVOLT local server - keep open" cmd /k "cd /d \"%CD%\" && npm run dev"
+start "AQUAIVOLT local server - keep open" cmd /k "cd /d ""%CD%"" && npm run dev"
 
 echo Waiting for the dashboard to start...
 timeout /t 8 /nobreak >nul
