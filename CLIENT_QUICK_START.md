@@ -48,6 +48,14 @@ The dashboard, AI model calculation, 2,000-scenario generation, reports, and loc
 ## If something goes wrong
 
 - **Node.js not found:** install Node.js 22 LTS, close all Command Prompt/PowerShell windows, open a new one, and double-click `START_AQUAIVOLT.bat` again.
+- **Package installation stopped, timed out, or `next` is not recognized:** close all AQUAIVOLT command windows. Open PowerShell in the `Biogas-prod` folder and run the following repair command, then double-click `START_AQUAIVOLT.bat` again:
+
+  ```powershell
+  Remove-Item -LiteralPath .\node_modules -Recurse -Force
+  npm install --no-audit --no-fund
+  ```
+
+  The initial package installation requires a stable internet connection. Do not delete any other folder.
 - **The browser does not open:** go to `http://localhost:3000` manually after the server window says the app is ready.
 - **Port 3000 is in use:** close the other AQUAIVOLT/Node command window, then run `START_AQUAIVOLT.bat` again.
 - **To stop the dashboard:** close the server command window or press `Ctrl+C` inside it.

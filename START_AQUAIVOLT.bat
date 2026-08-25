@@ -41,15 +41,24 @@ if not exist ".env.local" (
   notepad.exe "%CD%\.env.local"
 )
 
-if not exist "node_modules" (
-  echo Installing application packages. This happens only on the first run and can take a few minutes...
-  call npm install
+if not exist "node_modules\.bin\next.cmd" (
+  echo Installing or repairing application packages. This happens on the first run and can take a few minutes...
+  echo The installer will retry temporary internet interruptions automatically.
+  call npm install --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=120000
   if errorlevel 1 (
     echo.
-    echo Package installation did not finish. Check that the laptop is connected to the internet and run this file again.
+    echo Package installation did not finish. Check that the laptop is connected to the internet, then run this file again.
     pause
     exit /b 1
   )
+)
+
+if not exist "node_modules\.bin\next.cmd" (
+  echo.
+  echo The installation is incomplete because the Next.js command is missing.
+  echo Run the repair steps in CLIENT_QUICK_START.md, then start this file again.
+  pause
+  exit /b 1
 )
 
 echo.
