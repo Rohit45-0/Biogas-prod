@@ -8,19 +8,19 @@ type Message = { role?: string; text?: string };
 
 function fallbackAnswer(question: string, inputs: Inputs, prediction: Prediction | null) {
   const q = question.toLowerCase();
-  const best = prediction?.bestSetpoints ?? { feedRate:870, temperature:37, ph:7.2, olr:3.2, hrt:22, codIn:7000, vfa:1100, mixing:50 };
+  const best = prediction?.bestSetpoints ?? { feedRate:871, temperature:37, ph:6.91, olr:4.57, hrt:24, codIn:7000, vfa:1100, mixing:50 };
   const outputs = prediction?.biogas !== undefined
-    ? `The current estimate is ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methane?.toFixed(1)} m3 CH4/day methane, and ${prediction.electricity?.toFixed(1)} kWh/day.`
+    ? `The current estimate is ${prediction.biogas.toFixed(1)} m³/day biogas, ${prediction.methane?.toFixed(1)} m³ CH₄/day methane, and ${prediction.electricity?.toFixed(1)} kWh/day.`
     : "Run a prediction first and I can explain the scenario-specific result.";
 
   if (q.includes("best") || q.includes("recommend") || q.includes("setpoint") || q.includes("improve")) {
-    return `For the selected feedstock's strongest supplied scenario: feed ${best.feedRate} kg VS/day, pH ${best.ph.toFixed(2)}, temperature ${best.temperature.toFixed(1)} C, OLR ${best.olr.toFixed(1)} kg COD/m3/day, HRT ${best.hrt} days, COD ${best.codIn} mg/L, VFA ${best.vfa} mg/L, and mixing ${best.mixing} RPM. ${outputs} Validate physical changes with the operator and VFA/alkalinity checks.`;
+    return `The bounded lower-HRT search recommends: feed ${best.feedRate} kg VS/day, pH ${best.ph.toFixed(2)}, temperature ${best.temperature.toFixed(1)} C, OLR ${best.olr.toFixed(2)} kg VS/m3/day, and HRT ${best.hrt} hours. ${outputs} These five values are the direct model features. Validate any physical change with the operator before applying it.`;
   }
   if (q.includes("ph")) {
     return `Your pH is ${inputs.ph ?? "not entered"}. The active synthetic model's best result is near pH ${best.ph.toFixed(2)}. ${outputs} Treat this as a simulation recommendation, not an automatic dosing instruction.`;
   }
   if (q.includes("methane") || q.includes("electricity") || q.includes("biogas")) {
-    return `${outputs} Biogas volume, methane volume, and generator power come from the multi-input scenario inference; daily electricity is predicted generator kW multiplied by 24 hours. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixing all influence the result.`;
+    return `${outputs} Biogas, methane and electricity come from the five-value short-HRT model: feed rate, temperature, pH, OLR and HRT in hours. Feedstock, COD, VFA and mixing are retained as contextual audit fields, not learned features in this model.`;
   }
   if (q.includes("alert") || q.includes("alarm") || q.includes("limit") || q.includes("attention")) {
     const active = prediction?.alerts?.filter((alert) => alert.status !== "normal") ?? [];
@@ -28,11 +28,14 @@ function fallbackAnswer(question: string, inputs: Inputs, prediction: Prediction
     if (!active.length) return `No configured gas threshold is active for this simulation. ${outputs} These are model-derived checks, not physical leakage alarms.`;
     return `${active.map((alert) => `${alert.label}: ${alert.value.toFixed(1)} ${alert.unit} (${alert.message}; configured ${alert.limit})`).join(" ")} Review these simulated alerts with the operator; no equipment command has been sent.`;
   }
-  if (q.includes("model") || q.includes("random") || q.includes("prediction")) {
-    return `This dashboard uses a deterministic multi-input, distance-weighted scenario model, not random numbers. Feedstock, feed rate, temperature, pH, OLR, HRT, COD, VFA, and mixing are all considered. It is anchored to the supplied optimization cases and uses the synthetic SCADA ranges for coverage, so it remains a prototype rather than a live-plant validated model. ${outputs}`;
+  if (q.includes("export") || q.includes("monthly") || q.includes("daily report") || q.includes("report")) {
+    return `In AQUAIVOLT AI reports, select Generate AI model output, then Approve AI action to unlock the report exports. Export daily baseline vs AI provides the 30 modelled operating-day groups, and Export 12-month comparison provides their monthly 30-day totals. Both exports are calculated from the trained model; they are not copied target values from the supplied workbook.`;
+  }
+  if (q.includes("model") || q.includes("random") || q.includes("prediction") || q.includes("trained")) {
+    return `AQUAIVOLT AI Optimisation uses a deterministic LangGraph workflow and exported quadratic Ridge-regression coefficients, not random numbers. It processes feed rate, temperature, pH, OLR and HRT in hours through the trained model. Online reading then creates 2,000 new bounded optimisation scenarios; those results are calculated by the model, not copied from a workbook. ${outputs}`;
   }
   if (q.includes("hrt") || q.includes("retention")) {
-    return "The active dashboard model now uses the normal 15.45-34.62 day HRT range from the synthetic SCADA coverage data. The separate below-6-hour and hours-scale workbooks remain research extrapolations and are not used for normal-mode recommendations.";
+    return "The active dashboard model uses a 2 to 24 hour HRT range from the supplied 500-row hours-scale synthetic workbook. The recommendation search prefers a lower HRT only when its modeled biogas, methane and electricity outputs do not fall below the submitted condition. It is still an advisory simulation requiring operator review.";
   }
   return `${outputs} I can explain the model, the source workbooks, safe limits, or the best modeled setpoints.`;
 }
@@ -50,9 +53,9 @@ async function generateAnswer(question: string, inputs: Inputs, prediction: Pred
   const plantState = prediction?.biogas !== undefined
     ? `Current prediction: ${prediction.biogas.toFixed(1)} m3/day biogas, ${prediction.methane?.toFixed(1)} m3 CH4/day methane, ${prediction.electricity?.toFixed(1)} kWh/day, ${prediction.carbon?.toFixed(2)} tCO2e/day. Run ID: ${prediction.runId ?? "not available"}. Current operator recommendations: ${(prediction.recommendations ?? []).map((item) => item.title).join("; ") || "none"}.`
     : "No prediction has been run in this chat yet.";
-  const currentInputs = `Current inputs: feedstock ${inputs.feedstock ?? "n/a"}, feed rate ${inputs.feedRate ?? "n/a"} kg VS/day, temperature ${inputs.temperature ?? "n/a"} C, pH ${inputs.ph ?? "n/a"}, OLR ${inputs.olr ?? "n/a"} kg COD/m3/day, HRT ${inputs.hrt ?? "n/a"} days, COD ${inputs.codIn ?? "n/a"} mg/L, VFA ${inputs.vfa ?? "n/a"} mg/L, mixing ${inputs.mixing ?? "n/a"} RPM.`;
+  const currentInputs = `Current direct model values: feed rate ${inputs.feedRate ?? "n/a"} kg VS/day, temperature ${inputs.temperature ?? "n/a"} C, pH ${inputs.ph ?? "n/a"}, OLR ${inputs.olr ?? "n/a"} kg VS/m3/day, HRT ${inputs.hrt ?? "n/a"} hours. Context-only audit fields: feedstock ${inputs.feedstock ?? "n/a"}, COD ${inputs.codIn ?? "n/a"} mg/L, VFA ${inputs.vfa ?? "n/a"} mg/L, mixing ${inputs.mixing ?? "n/a"} RPM.`;
   const recentChat = history.slice(-6).map((message) => `${message.role === "user" ? "User" : "Copilot"}: ${String(message.text ?? "").slice(0, 500)}`).join("\n");
-  const prompt = `You are Aqua Copilot, a concise, practical assistant for a biogas dashboard prototype. Answer the user's question using the retrieved project evidence below and the current simulation context. Use simple language and absolute units such as m3/day and kWh/day; do not use percentage numbers. If evidence is missing, say so. Do not imply that synthetic data proves real plant performance. Do not instruct automatic control of equipment or dosing; frame recommendations as simulations requiring operator review. Mention the active model's synthetic limits whenever material. Use 2 to 5 short sentences and include no markdown table.\n\nRetrieved project evidence:\n${context}\n\n${plantState}\n${currentInputs}\n\nRecent chat:\n${recentChat || "None"}\n\nUser question: ${question}`;
+  const prompt = `You are AQUAIVOLT Copilot, a concise, practical assistant for a biogas AI-optimisation prototype. Answer the user's question using the retrieved project evidence below and the current simulation context. Use simple language and absolute units such as m³/day and kWh/day; do not use percentage numbers. Never mention the supplied dataset row count, the word "500", or workbook file names. If asked how the model works, say it uses five direct plant values and creates 2,000 fresh deterministic optimisation scenarios by re-running the trained model—not by copying workbook targets and not with random numbers. If asked about reports, explain that the daily export covers 30 modelled operating-day groups and the 12-month export groups them into readable 30-day monthly totals. If evidence is missing, say so. Do not imply that synthetic data proves real plant performance. Do not instruct automatic control of equipment or dosing; frame recommendations as simulations requiring operator review. Mention the active model's synthetic limits whenever material. Use 2 to 5 short sentences and include no markdown table.\n\nRetrieved project evidence:\n${context}\n\n${plantState}\n${currentInputs}\n\nRecent chat:\n${recentChat || "None"}\n\nUser question: ${question}`;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -70,7 +73,10 @@ export async function POST(req: Request) {
   if (!text) return NextResponse.json({ answer: "Please enter a question." }, { status: 400 });
 
   const retrieved = await retrieveKnowledge(text);
-  const context = retrieved.chunks.map((chunk, index) => `[${index + 1}] ${chunk.source}: ${chunk.text}`).join("\n\n");
+  const redactDatasetDetail = (value: string) => value
+    .replace(/AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours\.xlsx/gi, "AQUAIVOLT short-HRT research workbook")
+    .replace(/\b500(?:-row| rows)?\b/gi, "supplied");
+  const context = retrieved.chunks.map((chunk, index) => `[${index + 1}] ${redactDatasetDetail(chunk.source)}: ${redactDatasetDetail(chunk.text)}`).join("\n\n");
   let answer = "";
   try {
     answer = (await generateAnswer(text, inputs, prediction, Array.isArray(history) ? history : [], context)) || "";
@@ -78,6 +84,6 @@ export async function POST(req: Request) {
     // Keep the prototype usable if the API key is unavailable or quota is exhausted.
   }
   if (!answer) answer = fallbackAnswer(text, inputs, prediction);
-  const sources = [...new Set(retrieved.chunks.map((chunk) => chunk.source))];
+  const sources = [...new Set(retrieved.chunks.map((chunk) => redactDatasetDetail(chunk.source)))];
   return NextResponse.json({ answer, sources, retrieval: retrieved.retrieval });
 }

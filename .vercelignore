@@ -10,3 +10,8 @@ work
 examples
 worker
 vite.config.ts
+client-demo-video
+ai-workflow/.venv
+tmp
+output
+build-manual-first.log

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "../../lib/auth";
-import { listSimulations } from "../../lib/audit";
+import { auditStoreReady, listSimulations } from "../../lib/audit";
 
 function csvCell(value: unknown) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -17,5 +17,8 @@ export async function GET(request: Request) {
       row.role, row.feedstock, row.model_version, row.inputs_json, row.outputs_json].map(csvCell).join(","))].join("\n");
     return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=aquaivolt-audit-log.csv" } });
   }
-  return NextResponse.json({ runs: rows.map((row) => ({ ...row, inputs: JSON.parse(String(row.inputs_json)), outputs: JSON.parse(String(row.outputs_json)) })) });
+  return NextResponse.json({
+    persistence: (await auditStoreReady()) ? "supabase" : "volatile",
+    runs: rows.map((row) => ({ ...row, inputs: JSON.parse(String(row.inputs_json)), outputs: JSON.parse(String(row.outputs_json)) })),
+  });
 }

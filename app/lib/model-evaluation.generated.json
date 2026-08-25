@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "short-hrt-evaluation-v2",
+  "generatedAt": "2026-08-22T20:00:56.177124+00:00",
+  "source": {
+    "workbook": "AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx",
+    "sheet": "Hours-Scale AI Synthetic 500",
+    "classification": "Synthetic research data — not operating-plant telemetry",
+    "rowCount": 500,
+    "sha256": "0ff8f1a88dcccd080f56b3539f86cae30d03752059618523683ae16841494781"
+  },
+  "features": [
+    "feedRate",
+    "temperature",
+    "ph",
+    "olr",
+    "hrtHours"
+  ],
+  "targets": [
+    "biogas",
+    "methane",
+    "electricity",
+    "h2s"
+  ],
+  "evaluation": {
+    "method": "5-fold shuffled cross-validation with fixed random_state=42",
+    "selectionMetric": "Mean normalized MAE across biogas, methane and electricity",
+    "models": [
+      {
+        "id": "ridge_polynomial",
+        "label": "Ridge regression with quadratic features",
+        "normalizedMae": 0.0156637,
+        "targets": {
+          "biogas": {
+            "mae": 0.2742669,
+            "rmse": 0.3504691,
+            "r2": 0.9964166
+          },
+          "methane": {
+            "mae": 0.2510857,
+            "rmse": 0.3193562,
+            "r2": 0.9938107
+          },
+          "electricity": {
+            "mae": 0.9011099,
+            "rmse": 1.1461786,
+            "r2": 0.9938114
+          },
+          "h2s": {
+            "mae": 0.1547246,
+            "rmse": 0.1962095,
+            "r2": 0.9985446
+          }
+        },
+        "artifact": "ai-workflow/artifacts/ridge_polynomial.joblib",
+        "artifactSha256": "136740265c638d38d2f0ba5d8f4778c97037437f3e6ed38dc99f592af54c15ec"
+      },
+      {
+        "id": "hist_gradient_boosting",
+        "label": "HistGradientBoosting multi-output regressor",
+        "normalizedMae": 0.0171338,
+        "targets": {
+          "biogas": {
+            "mae": 0.2863601,
+            "rmse": 0.3640936,
+            "r2": 0.9961325
+          },
+          "methane": {
+            "mae": 0.2801407,
+            "rmse": 0.3531951,
+            "r2": 0.9924296
+          },
+          "electricity": {
+            "mae": 1.0030125,
+            "rmse": 1.2641118,
+            "r2": 0.9924723
+          },
+          "h2s": {
+            "mae": 0.1420035,
+            "rmse": 0.1839747,
+            "r2": 0.9987205
+          }
+        },
+        "artifact": "ai-workflow/artifacts/hist_gradient_boosting.joblib",
+        "artifactSha256": "7c67bf122d0f94c629319fde6cafb70dca6aad6079df4894f8014bb9a9f26914"
+      },
+      {
+        "id": "xgboost",
+        "label": "XGBoost multi-output regressor",
+        "normalizedMae": 0.0161703,
+        "targets": {
+          "biogas": {
+            "mae": 0.2785591,
+            "rmse": 0.3496519,
+            "r2": 0.9964332
+          },
+          "methane": {
+            "mae": 0.2611491,
+            "rmse": 0.3325038,
+            "r2": 0.9932906
+          },
+          "electricity": {
+            "mae": 0.9357103,
+            "rmse": 1.1912902,
+            "r2": 0.9933147
+          },
+          "h2s": {
+            "mae": 0.124027,
+            "rmse": 0.1543338,
+            "r2": 0.9990996
+          }
+        },
+        "artifact": "ai-workflow/artifacts/xgboost.joblib",
+        "artifactSha256": "a7bcefc3798f57eaec8e735991df472be85de90e5bf729870d59f49d0ab9bee8"
+      }
+    ]
+  },
+  "selection": {
+    "numericalWinner": "Ridge regression with quadratic features",
+    "numericalWinnerNormalizedMae": 0.0156637,
+    "deployedModel": "Ridge regression with quadratic features",
+    "deployedModelNormalizedMae": 0.0156637,
+    "reason": "Ridge is the portable exported-coefficient inference model used by the Vercel application. Any change to the deployed model requires a new server runtime, evaluation review and administrator approval.",
+    "approvalRequired": true
+  },
+  "runtime": {
+    "implementation": "TypeScript exported Ridge coefficients orchestrated by LangGraph",
+    "artifacts": {
+      "ridge_polynomial": "136740265c638d38d2f0ba5d8f4778c97037437f3e6ed38dc99f592af54c15ec",
+      "hist_gradient_boosting": "7c67bf122d0f94c629319fde6cafb70dca6aad6079df4894f8014bb9a9f26914",
+      "xgboost": "a7bcefc3798f57eaec8e735991df472be85de90e5bf729870d59f49d0ab9bee8"
+    },
+    "frameworkVersions": {
+      "scikitLearn": "1.9.0",
+      "xgboost": "3.4.1"
+    }
+  },
+  "limitations": [
+    "Cross-validation measures fit to the supplied synthetic data generator, not predictive accuracy at a real plant.",
+    "Recommendations are advisory; no equipment is controlled.",
+    "Retraining must be approved after quality checks on timestamped plant data."
+  ]
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "../../lib/auth";
 import { modelCard, modelMetadata } from "../../lib/system";
+import { shortHrtModelMetadata } from "../../lib/short-hrt-model";
 
 export async function GET(request: Request) {
   const session = await getSession(request);
@@ -8,6 +9,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     model: modelMetadata,
     card: modelCard,
+    shortHrtModel: shortHrtModelMetadata,
     endpoint: "/api/predict",
     generatedAt: new Date().toISOString(),
   });
