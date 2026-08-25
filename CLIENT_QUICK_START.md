@@ -52,10 +52,10 @@ The dashboard, AI model calculation, 2,000-scenario generation, reports, and loc
 
   ```powershell
   Remove-Item -LiteralPath .\node_modules -Recurse -Force
-  npm install --no-audit --no-fund
+  npm.cmd install --no-audit --no-fund --fetch-retries=5
   ```
 
-  The initial package installation requires a stable internet connection. Do not delete any other folder.
+  `npm.cmd` avoids a restrictive Windows PowerShell script policy; no administrator permission or policy change is needed. The initial package installation requires a stable internet connection. Do not delete any other folder.
 - **The browser does not open:** go to `http://localhost:3000` manually after the server window says the app is ready.
 - **Port 3000 is in use:** close the other AQUAIVOLT/Node command window, then run `START_AQUAIVOLT.bat` again.
 - **To stop the dashboard:** close the server command window or press `Ctrl+C` inside it.
