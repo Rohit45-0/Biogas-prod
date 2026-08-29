@@ -165,6 +165,8 @@ export default function Home(){
   if(checking)return <main className="loading-screen"><span>◒</span><b>Opening dashboard…</b></main>;
   if(!auth)return <LoginScreen username={username} password={password} error={loginError} busy={loginBusy} onUsername={setUsername} onPassword={setPassword} onSubmit={login}/>;
 
+  return <OperationsDashboard auth={auth} onLogout={()=>void logout()} onSettings={auth.role==="admin"?()=>void openSettings():undefined}/>;
+
   const active=outputs[activeOutput];
   return <main className="simple-shell">
     <aside className="simple-sidebar">
@@ -265,6 +267,128 @@ export default function Home(){
     {chatOpen&&<Copilot messages={messages} question={question} busy={chatBusy} result={result} onQuestion={setQuestion} onAsk={ask} onClose={()=>setChatOpen(false)} onApply={()=>{if(result)setInputs(current=>({...current,...result.bestSetpoints}));}}/>}
     {settingsOpen&&auth.role==="admin"&&<SettingsModal settings={settings} message={settingsMessage} onChange={setSettings} onSave={saveSettings} onClose={()=>setSettingsOpen(false)}/>}
     {loading&&<AiAnalysisCenter inputs={inputs} activeOutput={activeOutput} stage={analysisStage} paused={analysisPaused} onTogglePause={()=>setAnalysisPaused(current=>!current)}/>}
+  </main>;
+}
+
+type OperationsTab="overview"|"optimizer"|"workflow"|"reports"|"audit";
+
+function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:()=>void;onSettings?:()=>void}){
+  const stages:BatchWorkflowStage[]=[
+    {label:"Read online conditions",detail:"Read the modelled online operating conditions. Physical IoT sensors are not connected in this prototype."},
+    {label:"Validate plant values",detail:"Check feed rate, temperature, pH, OLR and HRT in hours for every operating condition."},
+    {label:"Prepare model features",detail:"Transform the five operational values into the format used by the deployed prediction model."},
+    {label:"Calculate baseline",detail:"Calculate a condition-specific baseline so the AI result has a fair comparison point."},
+    {label:"Create AI candidates",detail:"Create bounded alternative operating setpoints from each online condition."},
+    {label:"Run production model",detail:"Run every candidate through the deployed deterministic short-HRT Ridge model."},
+    {label:"Calculate six KPIs",detail:"Build biogas, methane, electricity, H₂S removal and CO₂e output values."},
+    {label:"Build reports",detail:"Rank options, prepare the daily and monthly modelled reports, and save audit evidence when storage is available."},
+  ];
+  const [tab,setTab]=useState<OperationsTab>("overview");
+  const [report,setReport]=useState<BatchResult|null>(null);
+  const [pendingReport,setPendingReport]=useState<BatchResult|null>(null);
+  const [working,setWorking]=useState(false);
+  const [paused,setPaused]=useState(false);
+  const [stage,setStage]=useState(0);
+  const [selectedStage,setSelectedStage]=useState(0);
+  const [approved,setApproved]=useState(false);
+  const [metric,setMetric]=useState<"biogas"|"methane"|"electricity">("methane");
+  const [message,setMessage]=useState("");
+
+  useEffect(()=>{void (async()=>{
+    try{
+      const response=await fetch("/api/reports/batch?limit=1",{cache:"no-store"});
+      const data=await response.json();
+      const latest=data.reports?.[0] as BatchReportRecord|undefined;
+      if(latest?.summary) setReport({id:latest.id,createdAt:new Date(latest.created_at).toISOString(),persisted:data.persistence==="supabase",persistence:data.persistence==="supabase"?"supabase":"volatile",definition:latest.definition as BatchResult["definition"],summary:latest.summary,preview:[],workflow:stages,notes:[]});
+    }catch{/* The dashboard can still run a new model calculation. */}
+  })();},[]);
+
+  useEffect(()=>{
+    if(!working||paused)return;
+    if(stage<stages.length-1){
+      const timer=window.setTimeout(()=>setStage(current=>Math.min(stages.length-1,current+1)),760);
+      return()=>window.clearTimeout(timer);
+    }
+    if(pendingReport){
+      const timer=window.setTimeout(()=>{setReport(pendingReport);setPendingReport(null);setWorking(false);setApproved(false);setMessage("2,000 new deterministic model calculations are ready to review and export.");},650);
+      return()=>window.clearTimeout(timer);
+    }
+  },[working,paused,stage,pendingReport,stages.length]);
+
+  async function generate(){
+    if(working)return;
+    setTab("workflow");setWorking(true);setPaused(false);setStage(0);setSelectedStage(0);setPendingReport(null);setMessage("");setApproved(false);
+    try{
+      const [response]=await Promise.all([
+        fetch("/api/reports/batch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cohort:"short_hrt_batch",rowCount:2000})}),
+        new Promise(resolve=>window.setTimeout(resolve,6000)),
+      ]);
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"The AI calculation could not be completed.");
+      setPendingReport(data as BatchResult);
+    }catch(error){setWorking(false);setMessage(error instanceof Error?error.message:"The AI calculation could not be completed.");}
+  }
+
+  const projection=report?.summary.projection;
+  const daily=projection?.dailyMean;
+  const annual=projection?.annualized;
+  const best=report?.summary.bestScenario;
+  const start=report?.definition.shortHrtInput;
+  const displayStage=working?stage:report?stages.length-1:0;
+  const graphValue=(row:ModelledMonthlyProjectionRow,kind:"baseline"|"ai")=>metric==="biogas"?(kind==="baseline"?row.baseline_biogas_m3:row.optimized_biogas_m3):metric==="methane"?(kind==="baseline"?row.baseline_methane_m3:row.optimized_methane_m3):(kind==="baseline"?row.baseline_electricity_kwh:row.optimized_electricity_kwh);
+  const graphMax=Math.max(1,...(projection?.monthlyRows.flatMap(row=>[graphValue(row,"baseline"),graphValue(row,"ai")])||[1]));
+  const metricName=metric==="methane"?"Methane":metric==="electricity"?"Electricity":"Biogas";
+  const metricUnit=metric==="electricity"?"kWh / 30 modelled days":metric==="methane"?"m³ CH₄ / 30 modelled days":"m³ / 30 modelled days";
+  const kpis=[
+    ["Baseline biogas",daily?.baselineBiogasM3Day,"m³/day","baseline"],
+    ["AI biogas",daily?.optimizedBiogasM3Day,"m³/day","ai"],
+    ["AI methane",daily?.optimizedMethaneM3Day,"m³ CH₄/day","ai"],
+    ["AI electricity",daily?.optimizedElectricityKwhDay,"kWh/day","power"],
+    ["H₂S removed",daily?.h2sRemovedPpm,"ppm","safety"],
+    ["CO₂e avoided",daily?.estimatedCo2eAvoidedKgDay,"kg/day","climate"],
+  ] as const;
+  const adjustments=best&&start?[
+    ["Feed rate",start.feedRate,best.feed_rate_kg_vs_day,"kg VS/day"],
+    ["Temperature",start.temperature,best.temperature_c,"°C"],
+    ["pH",start.ph,best.ph,""],
+    ["OLR",start.olr,best.olr_kg_vs_m3_day,"kg VS/m³·d"],
+    ["HRT",start.hrtHours,best.hrt_hours,"hours"],
+  ] as const:[];
+
+  return <main className="ops-shell">
+    <aside className="ops-sidebar">
+      <div className="ops-brand"><span>◒</span><div><b>AQUAIVOLT</b><small>WASTEWATER TO OPTIMIZED ENERGY</small></div></div>
+      <nav aria-label="Dashboard navigation">
+        <button className={tab==="overview"?"active":""} onClick={()=>setTab("overview")}><span>▦</span>Overview</button>
+        <button className={tab==="optimizer"?"active":""} onClick={()=>setTab("optimizer")}><span>✦</span>AI Optimizer</button>
+        <button className={tab==="workflow"?"active":""} onClick={()=>setTab("workflow")}><span>◌</span>AI Workflow</button>
+        <button className={tab==="reports"?"active":""} onClick={()=>setTab("reports")}><span>▤</span>Reports</button>
+        {auth.role==="admin"&&<button className={tab==="audit"?"active":""} onClick={()=>setTab("audit")}><span>✓</span>Model audit</button>}
+        {onSettings&&<button onClick={onSettings}><span>⚙</span>Settings</button>}
+      </nav>
+      <div className="ops-side-status"><i/><b>MODEL READY</b><span>Online reading mode</span><small>IoT/SCADA connector is reserved for future sensor integration.</small></div>
+      <button className="ops-logout" onClick={onLogout}>Log out</button>
+    </aside>
+
+    <section className="ops-main">
+      <header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1><p>Online-reading optimisation workspace</p></div><div><span className="ops-status"><i/>Plant model online</span><span className="ops-status"><i/>AI supervised</span><button onClick={()=>void generate()} disabled={working}>{working?"AI is working…":"Generate 2,000 AI outputs"}</button><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div></div></header>
+      {message&&<div className={`ops-message ${message.includes("could not")?"error":""}`}>{message}</div>}
+
+      {tab==="overview"&&<section className="ops-view ops-overview">
+        <div className="ops-view-heading"><div><small>ONLINE-READING AI OPTIMISATION</small><h2>Production at a glance</h2><p>Run the deployed model to calculate all dashboard values.</p></div><button onClick={()=>void generate()} disabled={working}>{working?"AI calculation running…":"Run AI model"}</button></div>
+        <div className="ops-kpi-grid">{kpis.map(([label,value,unit,tone])=><article key={label} className={`ops-kpi ${tone}`}><small>{label}</small><b>{value===undefined?"—":format(value)}</b><span>{value===undefined?"Run model":unit}</span></article>)}</div>
+        <section className="ops-chart-card"><header><div><small>MODELLED COMPARISON</small><h2>Baseline vs AI-optimised {metricName}</h2><p>Each column is a 30-day modelled period generated by the online-reading calculation.</p></div><div className="ops-metric-tabs">{(["biogas","methane","electricity"] as const).map(item=><button key={item} className={metric===item?"active":""} onClick={()=>setMetric(item)}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div></header>{projection?<><div className="ops-bar-chart">{projection.monthlyRows.map(row=><article key={row.modelled_month}><small>{row.month_label.slice(0,3)}</small><div><i className="baseline" style={{height:`${Math.max(4,graphValue(row,"baseline")/graphMax*100)}%`}}/><i className="ai" style={{height:`${Math.max(4,graphValue(row,"ai")/graphMax*100)}%`}}/></div></article>)}</div><footer><span><i className="baseline"/>Baseline</span><span><i className="ai"/>AI-optimised</span><b>{metricUnit}</b></footer></>:<div className="ops-chart-empty"><span>✦</span><b>Ready to calculate the modelled comparison</b><p>Generate the AI outputs to show values here.</p></div>}</section>
+        <div className="ops-overview-bottom"><section className="ops-health-card"><header><small>PROCESS VALUES USED</small><b>Online-reading model</b></header>{best?<dl><div><dt>Feed rate</dt><dd>{format(best.feed_rate_kg_vs_day)} kg VS/day</dd></div><div><dt>Temperature</dt><dd>{format(best.temperature_c)} °C</dd></div><div><dt>pH</dt><dd>{format(best.ph)}</dd></div><div><dt>OLR</dt><dd>{format(best.olr_kg_vs_m3_day)} kg VS/m³·d</dd></div><div><dt>HRT</dt><dd>{format(best.hrt_hours)} hours</dd></div></dl>:<p>After calculation, the ranked AI operating condition is shown here.</p>}</section><section className="ops-insight-card"><small>AI RECOMMENDATION</small><h3>{best?"Use the top-ranked operating condition for review":"Recommendation is waiting"}</h3><p>{best?.ai_recommendation||"The AI recommendation will be calculated after the online-reading model runs."}</p><button onClick={()=>setTab("optimizer")} disabled={!best}>Review AI recommendation →</button></section><section className="ops-workflow-mini"><small>VISIBLE AI WORKFLOW</small><b>{working?`Running stage ${displayStage+1} of ${stages.length}`:report?"Completed and ready for audit":"Waiting to start"}</b><div>{stages.map((_,index)=><i key={index} className={index<=displayStage?"done":""}/>)}</div><button onClick={()=>setTab("workflow")}>Open workflow →</button></section></div>
+      </section>}
+
+      {tab==="optimizer"&&<section className="ops-view ops-optimizer"><div className="ops-view-heading"><div><small>AI OPTIMIZER</small><h2>Recommended operating action</h2><p>Every target comes from the highest-ranked deterministic model result.</p></div><button onClick={()=>void generate()} disabled={working}>Run again</button></div>{best&&start?<><section className="ops-recommendation"><div><small>EXPECTED AI OUTPUT</small><b>{format(best.optimized_biogas_m3_day)} <em>m³ biogas/day</em></b><span>AI methane {format(best.methane_m3_day)} m³ CH₄/day • electricity {format(best.electricity_kwh_day)} kWh/day</span></div><p>{best.ai_recommendation}</p><button className={approved?"approved":""} onClick={()=>setApproved(true)}>{approved?"AI action approved ✓":"Approve AI action"}</button></section><section className="ops-adjustment-table"><header><span>Parameter</span><span>Current</span><span>Recommended</span><span>Change</span></header>{adjustments.map(([label,current,target,unit])=><div key={label}><b>{label}</b><span>{format(current)} {unit}</span><strong>{format(target)} {unit}</strong><em>{target>current?"Increase":target<current?"Reduce":"Keep"}</em></div>)}</section><section className="ops-optimizer-footer"><article><small>MODEL ACTION</small><b>Advisory only</b><p>The recommendation changes no equipment. An operator must validate and apply any physical adjustment.</p></article><article><small>SHORT-HRT TARGET</small><b>{format(best.hrt_hours)} hours</b><p>The candidate score balances lower HRT with modelled biogas, methane and electricity production.</p></article><article><small>MODEL SCOPE</small><b>Five operating values</b><p>Feed rate, temperature, pH, OLR and HRT are the values evaluated by this deployed route.</p></article></section></>:<div className="ops-empty"><span>✦</span><h3>No AI recommendation yet</h3><p>Generate the 2,000 online-reading model outputs first.</p><button onClick={()=>void generate()}>Generate AI outputs</button></div>}</section>}
+
+      {tab==="workflow"&&<section className="ops-view ops-workflow-view"><div className="ops-workflow-head"><div><small>{paused?"PAUSED AUDITOR VIEW":"LIVE AI + MODEL WORKFLOW"}</small><h2>AI execution is visible</h2><p>One stage at a time: online conditions → prediction model → KPI outputs → reports.</p></div><div><button onClick={()=>setPaused(current=>!current)} disabled={!working}>{paused?"▶ Resume workflow":"Ⅱ Pause workflow"}</button><b>{String(displayStage+1).padStart(2,"0")} <small>of {String(stages.length).padStart(2,"0")}</small></b></div></div><div className="ops-workflow-progress"><i style={{width:`${(displayStage+1)/stages.length*100}%`}}/></div><div className="ops-workflow-source"><span><i/>Online reading</span><b>Simulated operating conditions</b><em>IoT sensors can connect here in a future deployment.</em></div><div className="ops-nodes">{stages.map((item,index)=>{const state=index<displayStage?"done":index===displayStage?(working?(paused?"paused":"active"):report?"done":"ready"):"queued";return <button key={item.label} className={state} onClick={()=>setSelectedStage(index)}><span>{String(index+1).padStart(2,"0")}</span><b>{item.label}</b><small>{state==="done"?"Completed":state==="active"?"Running now":state==="paused"?"Paused for audit":state==="ready"?"Ready":"Waiting"}</small></button>;})}</div><section className="ops-node-detail"><span>{String(selectedStage+1).padStart(2,"0")}</span><div><small>IMPLEMENTED MODEL STAGE</small><h3>{stages[selectedStage].label}</h3><p>{stages[selectedStage].detail}</p></div><aside><small>LIVE STATUS</small><b>{working?(paused?"Workflow paused for auditor review":"Calculation in progress"):report?"Model run complete":"Ready to begin"}</b><p>{report?"The completed report is available in the Reports tab and can be exported as CSV.":"No output is displayed until the server returns the model calculation."}</p></aside></section><div className="ops-workflow-actions"><button onClick={()=>void generate()} disabled={working}>{working?"AI calculation running…":"Start 2,000 AI calculations"}</button>{report&&<button onClick={()=>setTab("reports")}>Open AI reports →</button>}</div></section>}
+
+      {tab==="reports"&&<section className="ops-view ops-reports"><div className="ops-view-heading"><div><small>AI + KPI REPORT</small><h2>Daily and monthly modelled reports</h2><p>Exports contain the 2,000 calculated scenarios and the aggregated comparisons.</p></div><button onClick={()=>void generate()} disabled={working}>Generate new report</button></div>{report&&projection&&daily&&annual?<><div className="ops-report-widgets"><article><small>YEARLY BASELINE METHANE</small><b>{format(annual.baselineMethaneM3)} <em>m³ CH₄/year</em></b></article><article><small>YEARLY AI METHANE</small><b>{format(annual.optimizedMethaneM3)} <em>m³ CH₄/year</em></b></article><article><small>YEARLY BASELINE ELECTRICITY</small><b>{format(annual.baselineElectricityKwh)} <em>kWh/year</em></b></article><article><small>YEARLY AI ELECTRICITY</small><b>{format(annual.optimizedElectricityKwh)} <em>kWh/year</em></b></article></div><div className="ops-report-table"><header><span>Modelled period</span><span>Baseline biogas</span><span>AI biogas</span><span>AI methane</span><span>AI electricity</span><span>H₂S removed</span></header>{projection.monthlyRows.map(row=><div key={row.modelled_month}><b>{row.month_label}</b><span>{format(row.baseline_biogas_m3)} m³</span><strong>{format(row.optimized_biogas_m3)} m³</strong><span>{format(row.optimized_methane_m3)} m³</span><span>{format(row.optimized_electricity_kwh)} kWh</span><span>{format(row.h2s_removed_ppm)} ppm</span></div>)}</div><div className="ops-export-row"><a href={`/api/reports/batch?id=${report.id}&format=csv`}>Export 2,000 AI scenarios ↓</a><a href={`/api/reports/batch?id=${report.id}&format=daily`}>Export daily comparison ↓</a><a href={`/api/reports/batch?id=${report.id}&format=projection`}>Export 12-month comparison ↓</a></div></>:<div className="ops-empty"><span>▤</span><h3>No generated report yet</h3><p>Run the online-reading AI model to create reports and exports.</p><button onClick={()=>void generate()}>Generate AI report</button></div>}</section>}
+
+      {tab==="audit"&&<section className="ops-view ops-audit"><div className="ops-view-heading"><div><small>MODEL AUDIT</small><h2>Auditor-ready model evidence</h2><p>Technical facts for the implemented online-reading calculation.</p></div><button onClick={()=>setTab("workflow")}>Inspect workflow</button></div><div className="ops-audit-grid"><article><small>MODEL</small><b>Quadratic Ridge regression</b><p>Deterministic deployed coefficients evaluate five operating values for every candidate.</p></article><article><small>AI ORCHESTRATION</small><b>LangGraph StateGraph</b><p>Validates values, prepares features, calculates baseline, ranks candidates and records an audit trace.</p></article><article><small>RUNTIME OUTPUT</small><b>2,000 new calculations</b><p>Each output is calculated by the server model; workbook target cells are excluded from inference.</p></article><article><small>OPERATING LIMIT</small><b>Decision support only</b><p>IoT/SCADA control is not connected. Operator review is required before plant changes.</p></article></div>{report?<section className="ops-audit-run"><div><small>LATEST REPORT</small><b>{report.id}</b><span>{new Date(report.createdAt).toLocaleString()}</span></div><div><small>STATUS</small><b>{report.persisted?"Saved server-side":"Temporary server report"}</b><span>{report.summary.totalRows.toLocaleString()} calculated candidates</span></div><div><small>MODEL RESULT</small><b>{format(report.summary.bestScenario.optimized_biogas_m3_day)} m³/day biogas</b><span>Highest-ranked option</span></div></section>:<div className="ops-empty compact"><span>✓</span><h3>Run a report to create audit evidence</h3><p>The execution record and CSV exports appear after a model run.</p></div>}<div className="ops-audit-links"><a href="/api/model" target="_blank">Open model card JSON ↗</a><a href="/api/evaluation" target="_blank">Open model evaluation JSON ↗</a><a href="/api/audit?format=csv" download>Download server audit log ↓</a></div></section>}
+    </section>
   </main>;
 }
 
