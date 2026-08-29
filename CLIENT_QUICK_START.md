@@ -36,8 +36,8 @@ Then double-click `START_AQUAIVOLT.bat` in that folder.
 
 | Account | Username | Password |
 | --- | --- | --- |
-| Administrator | `admin` | `admin123` |
-| User | `user` | `user123` |
+| Administrator | `admin` | `doris@777` |
+| User | `user` | `doris@777` |
 
 These are local demonstration accounts. They can be changed in `.env.local` later.
 

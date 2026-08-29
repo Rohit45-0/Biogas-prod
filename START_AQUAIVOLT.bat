@@ -72,7 +72,7 @@ start "" "http://localhost:3000"
 echo The browser should now open at http://localhost:3000
 echo.
 echo Local login details:
-echo   Administrator: admin / admin123
-echo   User:          user / user123
+echo   Administrator: admin / doris@777
+echo   User:          user / doris@777
 echo.
 exit /b 0
