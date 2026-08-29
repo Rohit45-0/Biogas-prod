@@ -34,8 +34,16 @@ test("builds the data-backed SCADA operations dashboard", async () => {
   assert.match(page, /AI Model Health/);
   assert.match(page, /Recent AI Actions/);
   assert.match(page, /Approve AI setpoints/);
-  assert.match(page, /Run AI model/);
-  assert.match(page, /2,000 new deterministic model calculations/);
+  assert.match(page, /RUN AI OPTIMIZATION/);
+  assert.match(page, /2,000 new deterministic optimization calculations/);
+  assert.match(page, /Biogas Production Optimization Dashboard/);
+  assert.match(page, /Methane Yield Optimization Dashboard/);
+  assert.match(page, /Electricity Output Optimization Dashboard/);
+  assert.match(page, /SCADA Workbook Optimization/);
+  assert.match(page, /Model baseline vs AI-optimized/);
+  assert.match(page, /Export all 2,000 scenarios/);
+  assert.match(page, /The workbook supplies operating conditions/);
+  assert.match(page, /Physical IoT\/PLC telemetry is not connected/);
   assert.match(page, /m³ CH₄\/day/);
   assert.match(page, /Quadratic Ridge/);
   assert.match(page, /LangGraph/);

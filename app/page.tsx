@@ -169,7 +169,8 @@ export default function Home(){
 
 }
 
-type OperationsTab="overview"|"optimizer"|"workflow"|"trends"|"alarms"|"reports"|"assets"|"explorer"|"audit"|"settings";
+type ProductTab="biogas"|"methane"|"electricity";
+type OperationsTab="overview"|ProductTab|"source"|"optimizer"|"workflow"|"trends"|"alarms"|"reports"|"assets"|"explorer"|"audit"|"settings";
 
 function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:()=>void;onSettings?:()=>void}){
   const stages:BatchWorkflowStage[]=[
@@ -193,6 +194,7 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
   const [metric,setMetric]=useState<"biogas"|"methane"|"electricity">("methane");
   const [trendRange,setTrendRange]=useState<"7D"|"30D"|"12M">("30D");
   const [message,setMessage]=useState("");
+  const [afterRunTab,setAfterRunTab]=useState<OperationsTab>("overview");
 
   useEffect(()=>{void (async()=>{
     try{
@@ -210,14 +212,14 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
       return()=>window.clearTimeout(timer);
     }
     if(pendingReport){
-      const timer=window.setTimeout(()=>{setReport(pendingReport);setPendingReport(null);setWorking(false);setApproved(false);setTab("overview");setMessage("2,000 new deterministic model calculations are ready to review and export.");},650);
+      const timer=window.setTimeout(()=>{setReport(pendingReport);setPendingReport(null);setWorking(false);setApproved(false);setTab(afterRunTab);setMessage("2,000 new deterministic optimization calculations are ready to review and export.");},650);
       return()=>window.clearTimeout(timer);
     }
-  },[working,paused,stage,pendingReport,stages.length]);
+  },[working,paused,stage,pendingReport,stages.length,afterRunTab]);
 
-  async function generate(){
+  async function generate(returnTo:OperationsTab="overview"){
     if(working)return;
-    setTab("workflow");setWorking(true);setPaused(false);setStage(0);setSelectedStage(0);setPendingReport(null);setMessage("");setApproved(false);
+    setAfterRunTab(returnTo);setTab("workflow");setWorking(true);setPaused(false);setStage(0);setSelectedStage(0);setPendingReport(null);setMessage("");setApproved(false);
     try{
       const [response]=await Promise.all([
         fetch("/api/reports/batch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cohort:"short_hrt_batch",rowCount:2000})}),
@@ -271,20 +273,23 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
     {tone:"warning",title:"PLC / IoT not connected",detail:"The current dashboard uses modelled online readings, not physical sensors."},
     ...(report?[{tone:approved?"success":"info",title:approved?"AI recommendation approved":"Operator review required",detail:approved?"The recommendation is marked approved in this session.":"Review the recommended setpoints before any plant adjustment."}]:[{tone:"info",title:"AI calculation waiting",detail:"Run the 2,000-scenario model to populate the control room."}]),
   ];
-  const navItems:[OperationsTab,string,string][]=[
-    ["overview","▦","Overview"],["workflow","⌁","Process Monitor"],["optimizer","✦","AI Optimizer"],["trends","⌁","Trends & Analytics"],["alarms","△","Alarms"],["reports","▤","Reports"],["assets","◇","Assets"],["explorer","⌕","Data Explorer"],...(auth.role==="admin"?[["audit","✓","Model Audit"] as [OperationsTab,string,string]]:[]),["settings","⚙","Settings"],
+  const navGroups:{label?:string;items:[OperationsTab,string,string][]}[]=[
+    {items:[["overview","▦","Overview"],["source","▤","SCADA Batch Reading"]]},
+    {label:"PRODUCTION OPTIMIZATION",items:[["biogas","◓","Biogas"],["methane","◆","Methane"],["electricity","ϟ","Electricity"]]},
+    {label:"ANALYTICS",items:[["workflow","⌁","Process Monitor"],["optimizer","✦","AI Optimizer"],["trends","⌁","Trends & Analytics"],["reports","▤","AI & KPI Reports"],["explorer","⌕","Scenario Explorer"],...(auth.role==="admin"?[["audit","✓","Model Audit"] as [OperationsTab,string,string]]:[])]},
+    {label:"SYSTEM",items:[["alarms","△","Alerts"],["assets","◇","Data Sources"],["settings","⚙","Settings"]]},
   ];
 
   return <main className="ops-shell">
     <aside className="ops-sidebar">
       <div className="ops-brand"><span>ϟ</span><div><b>AQUAIVOLT</b><small>WASTEWATER TO OPTIMIZED ENERGY</small></div></div>
-      <nav aria-label="Dashboard navigation">{navItems.map(([key,icon,label])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}><span>{icon}</span>{label}</button>)}</nav>
+      <nav aria-label="Dashboard navigation">{navGroups.map((group,index)=><div className="ops-nav-group" key={group.label||index}>{group.label&&<small>{group.label}</small>}{group.items.map(([key,icon,label])=><button key={key} className={tab===key?"active":""} onClick={()=>{setTab(key);if(key==="biogas"||key==="methane"||key==="electricity")setMetric(key);}}><span>{icon}</span>{label}</button>)}</div>)}</nav>
       <div className="ops-side-status"><span>✓</span><b>SYSTEM STATUS</b><strong>MODEL HEALTHY</strong><small>2,000-scenario engine ready<br/>PLC / IoT not connected</small></div>
       <button className="ops-logout" onClick={onLogout}>↪ Log out</button>
     </aside>
 
     <section className="ops-main">
-      <header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1></div><div><span className="ops-status"><i/>MODEL ONLINE</span><span className="ops-status warning"><i/>PLC NOT CONNECTED</span><button className="ops-ai-status" onClick={()=>setTab("workflow")}>◎ AI SUPERVISED OPTIMIZATION</button><button className="ops-run-button" onClick={()=>void generate()} disabled={working}>{working?"AI RUNNING…":"RUN AI MODEL"}</button><span className="ops-sync">Last run: {report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run"}</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div></div></header>
+      <header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1></div><div><span className="ops-status"><i/>MODEL ONLINE</span><span className="ops-status warning"><i/>PLC NOT CONNECTED</span><button className="ops-ai-status" onClick={()=>setTab("workflow")}>◎ AI SUPERVISED OPTIMIZATION</button><button className="ops-run-button" onClick={()=>void generate(tab==="biogas"||tab==="methane"||tab==="electricity"||tab==="source"?tab:"overview")} disabled={working}>{working?"AI OPTIMIZING…":"RUN AI OPTIMIZATION"}</button><span className="ops-sync">Last run: {report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run"}</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div></div></header>
       {message&&<div className={`ops-message ${message.includes("could not")?"error":""}`}>{message}</div>}
 
       {tab==="overview"&&<section className="ops-view ops-overview">
@@ -303,6 +308,10 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
         </div>
         <section className="ops-actions-card"><header><b>Recent AI Actions</b><small>{report?`Report ${report.id.slice(0,8)}`:"No report yet"}</small></header><div>{changeRows.slice(0,3).map((row,index)=><article key={row.label}><time>{String(index+1).padStart(2,"0")}</time><b>{row.label}</b><span>{format(row.current)} → <strong>{format(row.target)} {row.unit}</strong></span><em>Reason: ranked production result</em><i>{approved?"✓ Approved":"○ Awaiting review"}</i></article>)}{!best&&<p>Generate the AI outputs to create a reviewable action list.</p>}</div><button onClick={()=>setTab("optimizer")}>View all actions →</button></section>
       </section>}
+
+      {(tab==="biogas"||tab==="methane"||tab==="electricity")&&<ProductOptimizationDashboard product={tab} report={report} working={working} approved={approved} onApprove={()=>setApproved(true)} onRun={()=>void generate(tab)} onOpenOptimizer={()=>setTab("optimizer")} onOpenSource={()=>setTab("source")} />}
+
+      {tab==="source"&&<ScadaOptimizationWorkspace report={report} working={working} onRun={()=>void generate("source")} onOpenProduct={product=>{setMetric(product);setTab(product);}} />}
 
       {tab==="trends"&&<section className="ops-view ops-trends-view"><div className="ops-view-heading"><div><small>TRENDS & ANALYTICS</small><h2>Baseline versus AI production trends</h2><p>The same calculated report values used by the Overview, expanded for analysis.</p></div><button onClick={()=>void generate()} disabled={working}>Refresh model report</button></div><section className="ops-trend-panel expanded"><header><div><b>{metricName} model comparison</b><small>{trendRange==="12M"?"Twelve 30-day modelled periods":"Daily modelled output"}</small></div><div className="ops-chart-controls"><div className="ops-metric-tabs">{(["biogas","methane","electricity"] as const).map(item=><button key={item} className={metric===item?"active":""} onClick={()=>setMetric(item)}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div><div className="ops-range-tabs">{(["7D","30D","12M"] as const).map(item=><button key={item} className={trendRange===item?"active":""} onClick={()=>setTrendRange(item)}>{item}</button>)}</div></div></header>{projection?<div className="ops-line-chart"><svg viewBox="0 0 1000 170" role="img" aria-label={`Baseline versus AI ${metricName} trend`} preserveAspectRatio="none"><g className="grid">{[36,75,114,153].map(y=><line key={y} x1="28" x2="972" y1={y} y2={y}/>)}</g><path className="baseline" d={trendPath("baseline")}/><path className="ai" d={trendPath("ai")}/></svg><div className="ops-axis"><span>{trendSource[0]?.label}</span><span>{trendSource[Math.floor(trendSource.length/2)]?.label}</span><span>{trendSource.at(-1)?.label}</span></div></div>:<div className="ops-empty"><span>⌁</span><h3>No trend report yet</h3><p>Run the AI model to calculate baseline and optimized trends.</p><button onClick={()=>void generate()}>Run AI model</button></div>}<footer><span><i className="baseline"/>Baseline / no AI</span><span><i className="ai"/>AI optimized</span><b>{metricUnit}</b></footer></section></section>}
 
@@ -323,6 +332,68 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
       {tab==="audit"&&<section className="ops-view ops-audit"><div className="ops-view-heading"><div><small>MODEL AUDIT</small><h2>Auditor-ready model evidence</h2><p>Technical facts for the implemented online-reading calculation.</p></div><button onClick={()=>setTab("workflow")}>Inspect workflow</button></div><div className="ops-audit-grid"><article><small>MODEL</small><b>Quadratic Ridge regression</b><p>Deterministic deployed coefficients evaluate five operating values for every candidate.</p></article><article><small>AI ORCHESTRATION</small><b>LangGraph StateGraph</b><p>Validates values, prepares features, calculates baseline, ranks candidates and records an audit trace.</p></article><article><small>RUNTIME OUTPUT</small><b>2,000 new calculations</b><p>Each output is calculated by the server model; workbook target cells are excluded from inference.</p></article><article><small>OPERATING LIMIT</small><b>Decision support only</b><p>IoT/SCADA control is not connected. Operator review is required before plant changes.</p></article></div>{report?<section className="ops-audit-run"><div><small>LATEST REPORT</small><b>{report.id}</b><span>{new Date(report.createdAt).toLocaleString()}</span></div><div><small>STATUS</small><b>{report.persisted?"Saved server-side":"Temporary server report"}</b><span>{report.summary.totalRows.toLocaleString()} calculated candidates</span></div><div><small>MODEL RESULT</small><b>{format(report.summary.bestScenario.optimized_biogas_m3_day)} m³/day biogas</b><span>Highest-ranked option</span></div></section>:<div className="ops-empty compact"><span>✓</span><h3>Run a report to create audit evidence</h3><p>The execution record and CSV exports appear after a model run.</p></div>}<div className="ops-audit-links"><a href="/api/model" target="_blank">Open model card JSON ↗</a><a href="/api/evaluation" target="_blank">Open model evaluation JSON ↗</a><a href="/api/audit?format=csv" download>Download server audit log ↓</a></div></section>}
     </section>
   </main>;
+}
+
+function ProductOptimizationDashboard({product,report,working,approved,onApprove,onRun,onOpenOptimizer,onOpenSource}:{product:ProductTab;report:BatchResult|null;working:boolean;approved:boolean;onApprove:()=>void;onRun:()=>void;onOpenOptimizer:()=>void;onOpenSource:()=>void}){
+  const [range,setRange]=useState<"7D"|"30D"|"12M">("30D");
+  const projection=report?.summary.projection;
+  const daily=projection?.dailyMean;
+  const best=report?.summary.bestScenario;
+  const start=report?.definition.shortHrtInput;
+  const config={
+    biogas:{title:"Biogas Production Optimization Dashboard",subtitle:"AI optimization of total biogas production from the supplied SCADA operating conditions",label:"Biogas",unit:"m³/day",icon:"◓",tone:"blue"},
+    methane:{title:"Methane Yield Optimization Dashboard",subtitle:"AI optimization of methane yield, gas quality and the operating conditions that drive production",label:"Methane",unit:"m³ CH₄/day",icon:"◆",tone:"green"},
+    electricity:{title:"Electricity Output Optimization Dashboard",subtitle:"AI optimization of biogas-to-electricity output using the same ranked production scenarios",label:"Electricity",unit:"kWh/day",icon:"ϟ",tone:"amber"},
+  }[product];
+  const baseline=product==="biogas"?daily?.baselineBiogasM3Day:product==="methane"?daily?.baselineMethaneM3Day:daily?.baselineElectricityKwhDay;
+  const optimized=product==="biogas"?daily?.optimizedBiogasM3Day:product==="methane"?daily?.optimizedMethaneM3Day:daily?.optimizedElectricityKwhDay;
+  const gain=baseline!==undefined&&optimized!==undefined?optimized-baseline:undefined;
+  const methaneContent=daily&&daily.optimizedBiogasM3Day>0?daily.optimizedMethaneM3Day/daily.optimizedBiogasM3Day*100:undefined;
+  const rows=projection?(range==="12M"?projection.monthlyRows.map(row=>({label:row.month_label.slice(0,3),baseline:product==="biogas"?row.baseline_biogas_m3:product==="methane"?row.baseline_methane_m3:row.baseline_electricity_kwh,optimized:product==="biogas"?row.optimized_biogas_m3:product==="methane"?row.optimized_methane_m3:row.optimized_electricity_kwh})):projection.dailyRows.slice(range==="7D"?-7:0).map(row=>({label:String(row.modelled_day),baseline:product==="biogas"?row.baseline_biogas_m3_day:product==="methane"?row.baseline_methane_m3_day:row.baseline_electricity_kwh_day,optimized:product==="biogas"?row.optimized_biogas_m3_day:product==="methane"?row.optimized_methane_m3_day:row.optimized_electricity_kwh_day}))):[];
+  const values=rows.flatMap(row=>[row.baseline,row.optimized]);
+  const low=values.length?Math.min(...values)*.9:0;
+  const high=values.length?Math.max(...values)*1.06:1;
+  const point=(value:number,index:number)=>`${rows.length<2?40:26+index*(948/(rows.length-1))},${158-(value-low)/Math.max(.001,high-low)*121}`;
+  const path=(kind:"baseline"|"optimized")=>rows.map((row,index)=>`${index?"L":"M"}${point(row[kind],index)}`).join(" ");
+  const conditions=best&&start?[
+    {label:"Feed rate",current:start.feedRate,target:best.feed_rate_kg_vs_day,unit:"kg VS/day"},
+    {label:"Temperature",current:start.temperature,target:best.temperature_c,unit:"°C"},
+    {label:"pH level",current:start.ph,target:best.ph,unit:""},
+    {label:"Organic loading",current:start.olr,target:best.olr_kg_vs_m3_day,unit:"kg VS/m³·d"},
+    {label:"HRT",current:start.hrtHours,target:best.hrt_hours,unit:"hours"},
+  ]:[];
+  const cards=[
+    {label:"Biogas production",value:daily?.optimizedBiogasM3Day,unit:"m³/day",detail:daily?`Baseline ${format(daily.baselineBiogasM3Day)}`:"Waiting for optimization",icon:"◓"},
+    {label:"Methane content",value:methaneContent,unit:"% CH₄",detail:daily?`${format(daily.optimizedMethaneM3Day)} m³ CH₄/day`:"Calculated from biogas × CH₄",icon:"◆"},
+    {label:"Electricity output",value:daily?.optimizedElectricityKwhDay,unit:"kWh/day",detail:daily?`Baseline ${format(daily.baselineElectricityKwhDay)}`:"Waiting for optimization",icon:"ϟ"},
+    {label:"Process stability",value:daily?.processStabilityEstimatePct,unit:"/ 100",detail:"Model estimate, not sensor data",icon:"◎"},
+  ];
+  return <section className={`ops-view product-dashboard ${config.tone}`}>
+    <header className="product-heading"><div><small>PRODUCTION CENTER / {config.label.toUpperCase()} OPTIMIZATION</small><h2>{config.title}</h2><p>{config.subtitle}</p></div><div><span className="product-source-state"><i/>SCADA workbook source</span><button onClick={onRun} disabled={working}>{working?"AI optimizing…":"Run AI optimization"}</button></div></header>
+    <div className="product-kpis">{cards.map(card=><article key={card.label}><span>{card.icon}</span><div><small>{card.label}</small><b>{card.value===undefined?"—":format(card.value)} <em>{card.value===undefined?"":card.unit}</em></b><p>{card.detail}</p></div></article>)}</div>
+    <div className="product-primary-grid">
+      <section className="product-performance"><header><div><b>Model baseline vs AI-optimized {config.label}</b><small>{range==="12M"?"Twelve 30-day modelled periods":"Daily modelled comparison from the current report"}</small></div><div>{(["7D","30D","12M"] as const).map(item=><button key={item} className={range===item?"active":""} onClick={()=>setRange(item)}>{item}</button>)}</div></header>{projection?<div className="product-line"><svg viewBox="0 0 1000 180" preserveAspectRatio="none" role="img" aria-label={`${config.label} model baseline versus AI optimized output`}><g>{[38,78,118,158].map(y=><line key={y} x1="26" x2="974" y1={y} y2={y}/>)}</g><path className="baseline" d={path("baseline")}/><path className="optimized" d={path("optimized")}/></svg><div><span>{rows[0]?.label}</span><span>{rows[Math.floor(rows.length/2)]?.label}</span><span>{rows.at(-1)?.label}</span></div></div>:<div className="product-wait"><span>✦</span><b>Run the optimization to populate this dashboard</b><p>The graph will use calculated report values, not browser-generated numbers.</p></div>}<footer><span><i className="baseline"/>Model baseline</span><span><i className="optimized"/>AI optimized</span><b>{range==="12M"?`${config.unit.replace("/day","")} / 30 modelled days`:config.unit}</b></footer></section>
+      <section className="product-conditions"><header><b>Key operating conditions</b><small>Current → recommended</small></header>{conditions.length?conditions.map((item,index)=>{const movement=Math.abs(item.target-item.current)/Math.max(Math.abs(item.current),1);return <div className="product-condition" key={item.label}><span><b>{item.label}</b><em>{format(item.current)} → <strong>{format(item.target)} {item.unit}</strong></em></span><i><b style={{width:`${Math.min(100,50+movement*120)}%`}}/></i></div>}):<p>Recommended operating conditions appear after the optimization.</p>}</section>
+      <section className="product-status"><header><b>Optimization status</b><small>Auditable model indicators</small></header><div className="product-ring" style={{"--score":`${daily?.processStabilityEstimatePct||0}%`} as CSSProperties}><span><b>{daily?format(daily.processStabilityEstimatePct):"—"}</b><small>stability estimate</small></span></div><dl><div><dt>Model</dt><dd>Quadratic Ridge</dd></div><div><dt>Calculations</dt><dd>{report?.summary.totalRows.toLocaleString()||"—"}</dd></div><div><dt>Range coverage</dt><dd>{daily?`${format(daily.modelCoveragePct)}%`:"—"}</dd></div><div><dt>IoT / PLC</dt><dd className="offline">Not connected</dd></div></dl><button onClick={onOpenOptimizer}>View AI recommendations</button></section>
+    </div>
+    <div className="product-data-grid">
+      <section className="product-source-panel"><header><div><span>▤</span><div><b>SCADA workbook reading</b><small>Historical operating conditions used by the server model</small></div></div><button onClick={onOpenSource}>Open source workspace</button></header><div className="product-source-stats"><span><b>{projection?.sourceRows.toLocaleString()||"—"}</b>source conditions</span><span><b>{report?.summary.totalRows.toLocaleString()||"—"}</b>model calculations</span><span><b>{report?.persisted?"Saved":"Session"}</b>report storage</span><span><b>5</b>trained values</span></div><div className="product-source-table"><header><span>Rank</span><span>Source</span><span>HRT</span><span>Baseline</span><span>AI optimized</span></header>{report?.preview.slice(0,4).map(row=><div key={row.scenario_id}><b>#{row.rank}</b><span>{row.source_run_id||row.scenario_id}</span><span>{format(row.hrt_hours)} h</span><span>{format(product==="biogas"?row.baseline_biogas_m3_day:product==="methane"?row.baseline_methane_m3_day:row.baseline_electricity_kwh_day)}</span><strong>{format(product==="biogas"?row.optimized_biogas_m3_day:product==="methane"?row.methane_m3_day:row.electricity_kwh_day)}</strong></div>)}{report&&report.preview.length===0&&<p>Saved report summary loaded. Run a fresh optimization to inspect ranked rows.</p>}{!report&&<p>No calculated rows yet.</p>}</div></section>
+      <aside className="product-transparency"><article><span>◎</span><div><b>Data source</b><p>Supplied SCADA workbook; not a live sensor stream.</p></div></article><article><span>✦</span><div><b>AI optimization</b><p>Every candidate is evaluated by the deployed deterministic Ridge model.</p></div></article><article><span>✓</span><div><b>Operator decision</b><p>Recommendations are advisory until a human approves them.</p></div></article>{report?<a href={`/api/reports/batch?id=${report.id}&format=csv`}>Export all 2,000 scenarios ↓</a>:<button onClick={onRun}>Create export</button>}</aside>
+    </div>
+    <footer className="product-pipeline"><b>Optimization data flow</b>{["SCADA workbook","Validate","Map 5 values","Predict + optimize","Rank scenarios","Dashboard","Operator approval"].map((item,index)=><div key={item}><span className={report||index<3?"done":""}>{index<6?index+1:"✓"}</span><p><b>{item}</b><small>{index===0?"Source":index===3?"Ridge model":index===6?(approved?"Approved":"Review required"):"Completed on server"}</small></p>{index<6&&<i>→</i>}</div>)}</footer>
+  </section>;
+}
+
+function ScadaOptimizationWorkspace({report,working,onRun,onOpenProduct}:{report:BatchResult|null;working:boolean;onRun:()=>void;onOpenProduct:(product:ProductTab)=>void}){
+  const projection=report?.summary.projection;
+  const daily=projection?.dailyMean;
+  return <section className="ops-view scada-workspace">
+    <header className="product-heading"><div><small>DATA SOURCE / SCADA WORKBOOK</small><h2>SCADA Workbook Optimization</h2><p>Review the supplied operating conditions, run the deployed AI model, inspect ranked outputs, and export all 2,000 new calculations.</p></div><div><span className="product-source-state"><i/>Historical workbook source</span><button onClick={onRun} disabled={working}>{working?"AI optimizing…":"Run AI optimization"}</button></div></header>
+    <div className="scada-stage-flow">{["Read workbook","Validate values","Map model fields","Run AI optimization","Rank results","Available in dashboards"].map((label,index)=><div key={label} className={report||index<3?"done":""}><span>{index+1}</span><p><b>{label}</b><small>{index===0?"Supplied SCADA data":index===3?"2,000 calculations":"Server pipeline"}</small></p>{index<5&&<i>→</i>}</div>)}</div>
+    <div className="scada-kpis"><article><span>▤</span><small>Source conditions</small><b>{projection?.sourceRows.toLocaleString()||"—"}</b><p>Validated workbook rows</p></article><article><span>✦</span><small>AI optimization outputs</small><b>{report?.summary.totalRows.toLocaleString()||"—"}</b><p>New deterministic calculations</p></article><article><span>✓</span><small>Model-range coverage</small><b>{daily?`${format(daily.modelCoveragePct)}%`:"—"}</b><p>Coverage, not confidence</p></article><article><span>◎</span><small>Report evidence</small><b>{report?.persisted?"Saved":"Session"}</b><p>{report?.persisted?"Server-side persistence":"Available in current session"}</p></article></div>
+    <div className="scada-main-grid"><section className="scada-preview"><header><div><b>AI-optimized scenario preview</b><small>Highest-ranked rows returned by the deployed model</small></div>{report&&<a href={`/api/reports/batch?id=${report.id}&format=csv`}>Export 2,000 scenarios ↓</a>}</header><div><header><span>Rank</span><span>Source condition</span><span>HRT</span><span>Baseline biogas</span><span>AI biogas</span><span>AI methane</span><span>AI electricity</span></header>{report?.preview.slice(0,6).map(row=><div key={row.scenario_id}><b>#{row.rank}</b><span>{row.source_run_id||row.scenario_id}</span><span>{format(row.hrt_hours)} h</span><span>{format(row.baseline_biogas_m3_day)} m³/d</span><strong>{format(row.optimized_biogas_m3_day)} m³/d</strong><span>{format(row.methane_m3_day)} m³/d</span><span>{format(row.electricity_kwh_day)} kWh/d</span></div>)}{report&&report.preview.length===0&&<p>A stored report summary is available. Run the optimization again to load its row-level preview.</p>}{!report&&<div className="scada-empty"><span>✦</span><b>No optimization run yet</b><p>Select Run AI optimization to create ranked output rows.</p></div>}</div></section><aside className="scada-result"><small>LATEST OPTIMIZATION</small><h3>Production result</h3>{daily?<><dl><div><dt>Biogas</dt><dd>{format(daily.baselineBiogasM3Day)} → <strong>{format(daily.optimizedBiogasM3Day)} m³/day</strong></dd></div><div><dt>Methane</dt><dd>{format(daily.baselineMethaneM3Day)} → <strong>{format(daily.optimizedMethaneM3Day)} m³/day</strong></dd></div><div><dt>Electricity</dt><dd>{format(daily.baselineElectricityKwhDay)} → <strong>{format(daily.optimizedElectricityKwhDay)} kWh/day</strong></dd></div><div><dt>H₂S removed</dt><dd><strong>{format(daily.h2sRemovedPpm)} ppm</strong></dd></div></dl><p>{report?.summary.bestScenario.ai_recommendation}</p><div>{(["biogas","methane","electricity"] as const).map(item=><button key={item} onClick={()=>onOpenProduct(item)}>Open {item} dashboard →</button>)}</div></>:<><p>The baseline, optimized production, recommendation, and exports appear here after the server returns.</p><button onClick={onRun}>Run AI optimization</button></>}</aside></div>
+    <section className="scada-boundary"><b>Source and model boundary</b><p>The workbook supplies operating conditions. The 2,000 outputs are newly calculated by the server-side optimization model; workbook target/output cells are not copied into the scenario results.</p><em>Physical IoT/PLC telemetry is not connected. Any recommended setpoint requires operator review.</em></section>
+  </section>;
 }
 
 function LoginScreen({username,password,error,busy,onUsername,onPassword,onSubmit}:{username:string;password:string;error:string;busy:boolean;onUsername:(v:string)=>void;onPassword:(v:string)=>void;onSubmit:(e:FormEvent)=>void}){
