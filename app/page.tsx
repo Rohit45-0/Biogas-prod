@@ -289,7 +289,7 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
     </aside>
 
     <section className="ops-main">
-      {tab==="methane"?<header className="ops-header methane-app-header"><div><span>Production Center</span><i>/</i><b>Methane Dashboard</b></div><div><span className="ops-status"><i/>MODEL SYSTEM NORMAL</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role} operator</small></span></div></div></header>:<header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1></div><div><span className="ops-status"><i/>MODEL ONLINE</span><span className="ops-status warning"><i/>PLC NOT CONNECTED</span><button className="ops-ai-status" onClick={()=>setTab("workflow")}>◎ AI SUPERVISED OPTIMIZATION</button><button className="ops-run-button" onClick={()=>void generate(tab==="biogas"||tab==="electricity"||tab==="source"?tab:"overview")} disabled={working}>{working?"AI OPTIMIZING…":"RUN AI OPTIMIZATION"}</button><span className="ops-sync">Last run: {report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run"}</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div></div></header>}
+      {(tab==="methane"||tab==="electricity")?<header className="ops-header methane-app-header"><div><span>Production Center</span><i>/</i><b>{tab==="methane"?"Methane Dashboard":"Electricity Dashboard"}</b></div><div><span className="ops-status"><i/>MODEL SYSTEM NORMAL</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role} operator</small></span></div></div></header>:<header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1></div><div><span className="ops-status"><i/>MODEL ONLINE</span><span className="ops-status warning"><i/>PLC NOT CONNECTED</span><button className="ops-ai-status" onClick={()=>setTab("workflow")}>◎ AI SUPERVISED OPTIMIZATION</button><button className="ops-run-button" onClick={()=>void generate(tab==="biogas"||tab==="source"?tab:"overview")} disabled={working}>{working?"AI OPTIMIZING…":"RUN AI OPTIMIZATION"}</button><span className="ops-sync">Last run: {report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run"}</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div></div></header>}
       {message&&<div className={`ops-message ${message.includes("could not")?"error":""}`}>{message}</div>}
 
       {tab==="overview"&&<section className="ops-view ops-overview">
@@ -310,7 +310,8 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
       </section>}
 
       {tab==="methane"&&<MethaneOptimizationDashboard report={report} working={working} approved={approved} onApprove={()=>setApproved(true)} onRun={()=>void generate("methane")} onOpenOptimizer={()=>setTab("optimizer")} onOpenSource={()=>setTab("source")} />}
-      {(tab==="biogas"||tab==="electricity")&&<ProductOptimizationDashboard product={tab} report={report} working={working} approved={approved} onApprove={()=>setApproved(true)} onRun={()=>void generate(tab)} onOpenOptimizer={()=>setTab("optimizer")} onOpenSource={()=>setTab("source")} />}
+      {tab==="electricity"&&<ElectricityOptimizationDashboard report={report} working={working} approved={approved} onApprove={()=>setApproved(true)} onRun={()=>void generate("electricity")} onOpenOptimizer={()=>setTab("optimizer")} onOpenSource={()=>setTab("source")} />}
+      {tab==="biogas"&&<ProductOptimizationDashboard product={tab} report={report} working={working} approved={approved} onApprove={()=>setApproved(true)} onRun={()=>void generate(tab)} onOpenOptimizer={()=>setTab("optimizer")} onOpenSource={()=>setTab("source")} />}
 
       {tab==="source"&&<ScadaOptimizationWorkspace report={report} working={working} onRun={()=>void generate("source")} onOpenProduct={product=>{setMetric(product);setTab(product);}} />}
 
@@ -384,6 +385,58 @@ function MethaneOptimizationDashboard({report,working,approved,onApprove,onRun,o
     </div>
 
     <footer className="methane-pipeline"><b>Optimization Data Flow</b>{["Workbook","Validate","Map 5 values","Ridge model","Rank 2,000","Methane dashboard","Operator review"].map((item,index)=><div key={item}><span className={report||index<3?"done":""}>{index<6?index+1:"✓"}</span><p><b>{item}</b><small>{index===3?"Optimize":index===6?(approved?"Approved":"Review required"):"Server stage"}</small></p>{index<6&&<i>→</i>}</div>)}<button className={approved?"approved":""} disabled={!report} onClick={onApprove}>{approved?"Approved ✓":"Approve"}</button></footer>
+  </section>;
+}
+
+function ElectricityOptimizationDashboard({report,working,approved,onApprove,onRun,onOpenOptimizer,onOpenSource}:{report:BatchResult|null;working:boolean;approved:boolean;onApprove:()=>void;onRun:()=>void;onOpenOptimizer:()=>void;onOpenSource:()=>void}){
+  const [range,setRange]=useState<"7D"|"30D"|"12M">("30D");
+  const projection=report?.summary.projection;
+  const daily=projection?.dailyMean;
+  const best=report?.summary.bestScenario;
+  const start=report?.definition.shortHrtInput;
+  const extraEnergy=daily?daily.optimizedElectricityKwhDay-daily.baselineElectricityKwhDay:undefined;
+  const chartRows=projection?(range==="12M"?projection.monthlyRows.map(row=>({label:row.month_label.slice(0,3),baseline:row.baseline_electricity_kwh,optimized:row.optimized_electricity_kwh})):projection.dailyRows.slice(range==="7D"?-7:0).map(row=>({label:`D${row.modelled_day}`,baseline:row.baseline_electricity_kwh_day,optimized:row.optimized_electricity_kwh_day}))):[];
+  const chartValues=chartRows.flatMap(row=>[row.baseline,row.optimized]);
+  const chartLow=chartValues.length?Math.min(...chartValues)*.88:0;
+  const chartHigh=chartValues.length?Math.max(...chartValues)*1.06:1;
+  const point=(value:number,index:number)=>`${chartRows.length<2?40:18+index*(964/(chartRows.length-1))},${142-(value-chartLow)/Math.max(.001,chartHigh-chartLow)*110}`;
+  const chartPath=(kind:"baseline"|"optimized")=>chartRows.map((row,index)=>`${index?"L":"M"}${point(row[kind],index)}`).join(" ");
+  const conditions=best&&start?[
+    {label:"Feed rate",current:start.feedRate,target:best.feed_rate_kg_vs_day,unit:"kg VS/day",min:800,max:950},
+    {label:"Temperature (digester)",current:start.temperature,target:best.temperature_c,unit:"°C",min:30,max:70},
+    {label:"pH level",current:start.ph,target:best.ph,unit:"",min:6,max:8},
+    {label:"Organic loading rate",current:start.olr,target:best.olr_kg_vs_m3_day,unit:"kg VS/m³·d",min:0,max:75},
+    {label:"HRT (hydraulic retention)",current:start.hrtHours,target:best.hrt_hours,unit:"hours",min:2,max:24},
+  ]:[];
+  const sourceRows=report?.preview.slice(0,4)||[];
+  const runTime=report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run";
+  return <section className="ops-view methane-dashboard-exact electricity-dashboard-exact electricity-tone">
+    <header className="methane-page-title"><div><h1>Electricity Output Optimization Dashboard</h1><p>AI-powered optimization of biogas-to-electricity production</p></div><div><span>Last model run: <b>{runTime}</b></span><button onClick={onRun} disabled={working}>{working?"Optimizing…":"Run AI optimization"}</button></div></header>
+
+    <div className="methane-kpis">
+      <article><i className="electric">ϟ</i><div><small>AI electricity output</small><b>{daily?format(daily.optimizedElectricityKwhDay):"—"} <em>kWh/day</em></b><span>{daily?`Model baseline ${format(daily.baselineElectricityKwhDay)} kWh/day`:"Awaiting model report"}</span></div></article>
+      <article><i>⌁</i><div><small>Baseline daily energy</small><b>{daily?format(daily.baselineElectricityKwhDay):"—"} <em>kWh/day</em></b><span>Calculated comparison baseline</span></div></article>
+      <article><i className="blue">↗</i><div><small>Extra daily energy</small><b>{extraEnergy===undefined?"—":format(extraEnergy)} <em>kWh/day</em></b><span>AI output minus model baseline</span></div></article>
+      <article><i className="lime">♧</i><div><small>Estimated CO₂e avoided</small><b>{daily?format(daily.estimatedCo2eAvoidedKgDay):"—"} <em>kg/day</em></b><span>Derived estimate using the stated factor</span></div></article>
+    </div>
+
+    <div className="methane-main-row">
+      <section className="methane-chart-card"><header><div><b>AI vs Baseline Electricity Performance</b><small>{range==="12M"?"Twelve modelled 30-day periods":"Daily modelled values from the current optimization report"}</small></div><nav>{(["7D","30D","12M"] as const).map(item=><button key={item} className={range===item?"active":""} onClick={()=>setRange(item)}>{item}</button>)}</nav></header>{projection?<><div className="methane-chart"><svg viewBox="0 0 1000 160" preserveAspectRatio="none" role="img" aria-label="Model baseline versus AI optimized electricity output"><g>{[32,68,104,140].map(y=><line key={y} x1="18" x2="982" y1={y} y2={y}/>)}</g><path className="baseline" d={chartPath("baseline")}/><path className="optimized" d={chartPath("optimized")}/></svg><div><span>{chartRows[0]?.label}</span><span>{chartRows[Math.floor(chartRows.length/2)]?.label}</span><span>{chartRows.at(-1)?.label}</span></div></div><footer><span><i className="optimized"/>AI optimized</span><span><i className="baseline"/>Model baseline</span><b>{range==="12M"?"kWh / 30 modelled days":"kWh/day"}</b></footer></>:<div className="methane-empty"><b>Run AI optimization to compare electricity output</b><p>The graph uses server-calculated values only.</p></div>}</section>
+
+      <section className="methane-condition-card"><header><b>Key Operating Conditions</b><small>Current → AI recommended</small></header>{conditions.length?<div className="methane-conditions">{conditions.map(item=>{const width=Math.max(5,Math.min(100,(item.current-item.min)/Math.max(.001,item.max-item.min)*100));return <article key={item.label}><div><b>{item.label}</b><span>{format(item.current)} → <strong>{format(item.target)} {item.unit}</strong></span></div><i><b style={{width:`${width}%`}}/></i></article>})}</div>:<div className="methane-empty compact"><b>Energy-driving targets are waiting</b><p>Run the model to calculate them.</p></div>}</section>
+
+      <section className="methane-status-card"><header><b>Optimization Status</b></header><div className="methane-status-ring" style={{"--score":`${daily?.processStabilityEstimatePct||0}%`} as CSSProperties}><span><b>{daily?format(daily.processStabilityEstimatePct):"—"}</b><small>stability estimate</small></span></div><dl><div><dt>Model</dt><dd>Quadratic Ridge</dd></div><div><dt>Calculations</dt><dd>{report?.summary.totalRows.toLocaleString()||"—"}</dd></div><div><dt>Range coverage</dt><dd>{daily?`${format(daily.modelCoveragePct)}%`:"—"}</dd></div><div><dt>Generator sensors</dt><dd className="offline">Not connected</dd></div></dl><button onClick={onOpenOptimizer}>View AI recommendations</button></section>
+    </div>
+
+    <div className="methane-source-row">
+      <section className="methane-feed-card future"><header><div><i>◉</i><span><b>Online Electricity Feed</b><small>Future meter / generator connection</small></span></div><em>NOT CONNECTED</em></header><div className="methane-feed-stats"><span><b>0</b>live sources</span><span><b>0</b>meter files</span><span><b>0</b>processed</span><span><b>—</b>last sync</span></div><div className="methane-placeholder"><b>No electrical telemetry is connected</b><p>Voltage, current, power factor and generator-load readings will appear only after hardware integration.</p></div></section>
+
+      <section className="methane-feed-card"><header><div><i>▤</i><span><b>Supplied Workbook AI Feed</b><small>Research conditions processed by the electricity optimization model</small></span></div><button onClick={onOpenSource}>Open source</button></header><div className="methane-feed-stats"><span><b>{projection?.sourceRows.toLocaleString()||"—"}</b>source conditions</span><span><b>{report?.summary.totalRows.toLocaleString()||"—"}</b>calculations</span><span><b>{daily?`${format(daily.modelCoveragePct)}%`:"—"}</b>range coverage</span><span><b>{report?.persisted?"Saved":"Session"}</b>report store</span></div><div className="methane-mini-table"><header><span>Rank</span><span>Source</span><span>HRT</span><span>AI electricity</span><span>Status</span></header>{sourceRows.map(row=><div key={row.scenario_id}><b>#{row.rank}</b><span>{row.source_run_id||row.scenario_id}</span><span>{format(row.hrt_hours)} h</span><strong>{format(row.electricity_kwh_day)} kWh/d</strong><em>Calculated</em></div>)}{!report&&<p>Run AI optimization to calculate ranked electricity scenarios.</p>}</div></section>
+
+      <aside className="methane-truth-card"><header><b>Data & AI Status</b></header><article><i>▤</i><div><b>Research workbook</b><p>Supplies operating conditions; electrical telemetry is not invented.</p></div></article><article><i>✦</i><div><b>AI optimization</b><p>2,000 deterministic production scenarios calculate electricity output.</p></div></article><article><i>✓</i><div><b>Operator decision</b><p>Recommended plant setpoints remain advisory until approved.</p></div></article>{report?<a href={`/api/reports/batch?id=${report.id}&format=csv`}>Export 2,000 scenarios ↓</a>:<button onClick={onRun}>Create model report</button>}</aside>
+    </div>
+
+    <footer className="methane-pipeline"><b>Optimization Data Flow</b>{["Workbook","Validate","Map 5 values","Ridge model","Rank 2,000","Electricity dashboard","Operator review"].map((item,index)=><div key={item}><span className={report||index<3?"done":""}>{index<6?index+1:"✓"}</span><p><b>{item}</b><small>{index===3?"Optimize":index===6?(approved?"Approved":"Review required"):"Server stage"}</small></p>{index<6&&<i>→</i>}</div>)}<button className={approved?"approved":""} disabled={!report} onClick={onApprove}>{approved?"Approved ✓":"Approve"}</button></footer>
   </section>;
 }
 
