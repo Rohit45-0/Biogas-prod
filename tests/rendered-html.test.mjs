@@ -60,7 +60,11 @@ test("builds the data-backed SCADA operations dashboard", async () => {
   assert.match(page, /Quadratic Ridge/);
   assert.match(page, /LangGraph/);
   assert.match(page, /No fabricated hardware alerts/);
-  assert.match(page, /Calculated AI scenario evidence/);
+  assert.doesNotMatch(page, /Trends & Analytics/);
+  assert.doesNotMatch(page, /Scenario Explorer/);
+  assert.doesNotMatch(page, /MODEL AUDIT/);
+  assert.match(page, /initialOperationsBaseline/);
+  assert.match(page, /hasCurrentAiRun\?"AI BIOGAS":"BASELINE BIOGAS"/);
   assert.match(page, /Operator approval required/);
   assert.match(page, /daily\?\.optimizedBiogasM3Day/);
   assert.match(page, /daily\?\.optimizedMethaneM3Day/);
