@@ -65,6 +65,13 @@ test("builds the data-backed SCADA operations dashboard", async () => {
   assert.doesNotMatch(page, /MODEL AUDIT/);
   assert.match(page, /initialOperationsBaseline/);
   assert.match(page, /hasCurrentAiRun\?"AI BIOGAS":"BASELINE BIOGAS"/);
+  assert.match(page, /type KpiPeriod="line"\|"day"\|"month"\|"year"/);
+  assert.match(page, /Production totals/);
+  assert.match(page, /Choose how the calculated values are summarized/);
+  assert.match(page, /monthlyEquivalent/);
+  assert.match(page, /annualized/);
+  assert.match(page, /Best ranked scenario line/);
+  assert.match(page, /HRT, H₂S concentration and scenario count do not aggregate/);
   assert.match(page, /Operator approval required/);
   assert.match(page, /daily\?\.optimizedBiogasM3Day/);
   assert.match(page, /daily\?\.optimizedMethaneM3Day/);

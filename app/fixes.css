@@ -399,3 +399,13 @@
 @media(max-width:1400px){.ops-overview>.ops-lower-grid{grid-auto-rows:minmax(170px,auto)}.ops-overview>.ops-actions-card article{grid-template-columns:30px 90px 1fr 100px}.ops-overview>.ops-actions-card article em{display:none}}
 @media(max-width:1050px){.ops-overview>.ops-mid-grid>section,.ops-overview>.ops-lower-grid>section{min-height:180px}.ops-overview>.ops-actions-card{height:auto;min-height:135px}}
 @media(max-width:760px){.ops-shell{height:auto;min-height:100dvh;overflow:visible}.ops-main{height:auto;min-height:100dvh;overflow:visible}.ops-overview{display:block;padding:0 0 18px}.ops-overview>.ops-trend-panel{height:260px;margin-bottom:10px}.ops-overview>.ops-mid-grid,.ops-overview>.ops-lower-grid{margin-bottom:10px}.ops-overview>.ops-actions-card{height:auto;min-height:165px;grid-template-columns:1fr;grid-template-rows:34px auto 40px}.ops-overview>.ops-actions-card article{height:auto;min-height:34px;grid-template-columns:28px 74px 1fr 86px}.ops-overview>.ops-actions-card>button{grid-column:1;grid-row:3;border-left:0;border-top:1px solid #dce7ef}}
+
+/* Production cards can be audited as one scenario line, a daily mean,
+   a modelled 30-day period, or the complete 12-month projection. */
+.ops-kpi-period{min-height:50px;display:flex;align-items:center;gap:18px;padding:8px 12px;border:1px solid #dce7ef;border-radius:10px;background:#fff;box-shadow:0 4px 14px rgba(16,48,73,.045)}
+.ops-kpi-period>div{min-width:190px}.ops-kpi-period>div b,.ops-kpi-period>div span{display:block}.ops-kpi-period>div b{color:#173a5d;font-size:10px}.ops-kpi-period>div span{margin-top:2px;color:#72869a;font-size:7px}
+.ops-kpi-period nav{display:flex;gap:3px;padding:3px;border-radius:8px;background:#edf3f7}.ops-kpi-period nav button{min-width:64px;height:29px;border:0;border-radius:6px;background:transparent;color:#577087;font-size:8px;font-weight:850;cursor:pointer}.ops-kpi-period nav button:hover{background:#e0ebf3}.ops-kpi-period nav button.active{background:#087fd8;color:#fff;box-shadow:0 4px 10px rgba(8,127,216,.22)}
+.ops-kpi-period>small{margin-left:auto;color:#71869a;font-size:7px;line-height:1.35;text-align:right}
+.ops-kpi b{font-variant-numeric:tabular-nums}.ops-kpi em,.ops-kpi>div>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:1050px){.ops-kpi-period{align-items:flex-start;flex-wrap:wrap}.ops-kpi-period>small{width:100%;margin-left:0;text-align:left}}
+@media(max-width:760px){.ops-kpi-period{margin-bottom:10px;display:block}.ops-kpi-period nav{margin-top:8px;width:100%;overflow-x:auto}.ops-kpi-period nav button{flex:1;min-width:58px}.ops-kpi-period>small{display:block;margin-top:7px}}

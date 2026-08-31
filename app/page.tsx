@@ -171,6 +171,7 @@ export default function Home(){
 
 type ProductTab="biogas"|"methane"|"electricity";
 type OperationsTab="overview"|ProductTab|"source"|"optimizer"|"workflow"|"alarms"|"reports"|"assets"|"settings";
+type KpiPeriod="line"|"day"|"month"|"year";
 
 const initialOperationsBaseline={biogas:57.9,methane:27.4,electricity:98.4,hrtHours:24};
 
@@ -196,6 +197,7 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
   const [approved,setApproved]=useState(false);
   const [metric,setMetric]=useState<"biogas"|"methane"|"electricity">("methane");
   const [trendRange,setTrendRange]=useState<"7D"|"30D"|"12M">("30D");
+  const [kpiPeriod,setKpiPeriod]=useState<KpiPeriod>("day");
   const [message,setMessage]=useState("");
   const [afterRunTab,setAfterRunTab]=useState<OperationsTab>("overview");
   const [userMenuOpen,setUserMenuOpen]=useState(false);
@@ -248,6 +250,7 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
 
   const projection=report?.summary.projection;
   const daily=projection?.dailyMean;
+  const monthly=projection?.monthlyEquivalent;
   const annual=projection?.annualized;
   const best=report?.summary.bestScenario;
   const start=report?.definition.shortHrtInput;
@@ -256,18 +259,52 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
   const graphMax=Math.max(1,...(projection?.monthlyRows.flatMap(row=>[graphValue(row,"baseline"),graphValue(row,"ai")])||[1]));
   const metricName=metric==="methane"?"Methane":metric==="electricity"?"Electricity":"Biogas";
   const metricUnit=metric==="electricity"?"kWh / 30 modelled days":metric==="methane"?"m³ CH₄ / 30 modelled days":"m³ / 30 modelled days";
-  const methanePct=daily&&daily.optimizedBiogasM3Day>0?daily.optimizedMethaneM3Day/daily.optimizedBiogasM3Day*100:undefined;
-  const extraBiogas=daily?daily.optimizedBiogasM3Day-daily.baselineBiogasM3Day:undefined;
   const hasCurrentAiRun=Boolean(report&&daily);
+  const baselineFactor=kpiPeriod==="month"?30:kpiPeriod==="year"?360:1;
+  const periodValues=hasCurrentAiRun?(
+    kpiPeriod==="line"&&best?{
+      baselineBiogas:best.baseline_biogas_m3_day,optimizedBiogas:best.optimized_biogas_m3_day,
+      baselineMethane:best.baseline_methane_m3_day,optimizedMethane:best.methane_m3_day,
+      baselineElectricity:best.baseline_electricity_kwh_day,optimizedElectricity:best.electricity_kwh_day,
+      co2e:best.estimated_co2e_avoided_kg_day,
+    }:kpiPeriod==="month"&&monthly?{
+      baselineBiogas:monthly.baselineBiogasM3,optimizedBiogas:monthly.optimizedBiogasM3,
+      baselineMethane:monthly.baselineMethaneM3,optimizedMethane:monthly.optimizedMethaneM3,
+      baselineElectricity:monthly.baselineElectricityKwh,optimizedElectricity:monthly.optimizedElectricityKwh,
+      co2e:monthly.estimatedCo2eAvoidedKg,
+    }:kpiPeriod==="year"&&annual?{
+      baselineBiogas:annual.baselineBiogasM3,optimizedBiogas:annual.optimizedBiogasM3,
+      baselineMethane:annual.baselineMethaneM3,optimizedMethane:annual.optimizedMethaneM3,
+      baselineElectricity:annual.baselineElectricityKwh,optimizedElectricity:annual.optimizedElectricityKwh,
+      co2e:annual.estimatedCo2eAvoidedKg,
+    }:daily?{
+      baselineBiogas:daily.baselineBiogasM3Day,optimizedBiogas:daily.optimizedBiogasM3Day,
+      baselineMethane:daily.baselineMethaneM3Day,optimizedMethane:daily.optimizedMethaneM3Day,
+      baselineElectricity:daily.baselineElectricityKwhDay,optimizedElectricity:daily.optimizedElectricityKwhDay,
+      co2e:daily.estimatedCo2eAvoidedKgDay,
+    }:undefined
+  ):undefined;
+  const periodLabel=kpiPeriod==="line"?"Best ranked scenario line":kpiPeriod==="day"?"Daily model mean":kpiPeriod==="month"?"30-day modelled total":"12-month modelled total";
+  const productionUnit=(kind:"biogas"|"methane"|"electricity"|"co2e")=>{
+    const base=kind==="electricity"?"kWh":kind==="methane"?"m³ CH₄":kind==="co2e"?"kg CO₂e":"m³";
+    if(kpiPeriod==="line")return `${base}/day · best line`;
+    if(kpiPeriod==="month")return `${base}/30 days`;
+    if(kpiPeriod==="year")return `${base}/year`;
+    return `${base}/day`;
+  };
+  const optimizedBiogas=periodValues?.optimizedBiogas;
+  const optimizedMethane=periodValues?.optimizedMethane;
+  const methanePct=optimizedBiogas&&optimizedMethane!==undefined?optimizedMethane/optimizedBiogas*100:undefined;
+  const extraBiogas=periodValues?periodValues.optimizedBiogas-periodValues.baselineBiogas:undefined;
   const kpis:{label:string;value:number|undefined;unit:string;status:string;icon:string;tone:"blue"|"green"|"amber";positive?:boolean}[]=[
-    {label:hasCurrentAiRun?"AI BIOGAS":"BASELINE BIOGAS",value:hasCurrentAiRun?daily?.optimizedBiogasM3Day:baselineSnapshot.biogas,unit:"m³/day",status:hasCurrentAiRun?"AI-optimized output":"Before AI optimization",icon:"◓",tone:hasCurrentAiRun?"green":"blue"},
-    {label:hasCurrentAiRun?"AI METHANE":"BASELINE METHANE",value:hasCurrentAiRun?daily?.optimizedMethaneM3Day:baselineSnapshot.methane,unit:"m³ CH₄/day",status:hasCurrentAiRun&&methanePct!==undefined?`${format(methanePct)}% of biogas`:"Before AI optimization",icon:"◆",tone:hasCurrentAiRun?"green":"blue"},
-    {label:hasCurrentAiRun?"AI ELECTRICITY":"BASELINE ELECTRICITY",value:hasCurrentAiRun?daily?.optimizedElectricityKwhDay:baselineSnapshot.electricity,unit:"kWh/day",status:hasCurrentAiRun?"AI-optimized output":"Before AI optimization",icon:"ϟ",tone:hasCurrentAiRun?"green":"blue"},
+    {label:hasCurrentAiRun?"AI BIOGAS":"BASELINE BIOGAS",value:hasCurrentAiRun?periodValues?.optimizedBiogas:baselineSnapshot.biogas*baselineFactor,unit:productionUnit("biogas"),status:hasCurrentAiRun?periodLabel:"Before AI optimization",icon:"◓",tone:hasCurrentAiRun?"green":"blue"},
+    {label:hasCurrentAiRun?"AI METHANE":"BASELINE METHANE",value:hasCurrentAiRun?periodValues?.optimizedMethane:baselineSnapshot.methane*baselineFactor,unit:productionUnit("methane"),status:hasCurrentAiRun&&methanePct!==undefined?`${format(methanePct)}% of biogas · ${periodLabel}`:"Before AI optimization",icon:"◆",tone:hasCurrentAiRun?"green":"blue"},
+    {label:hasCurrentAiRun?"AI ELECTRICITY":"BASELINE ELECTRICITY",value:hasCurrentAiRun?periodValues?.optimizedElectricity:baselineSnapshot.electricity*baselineFactor,unit:productionUnit("electricity"),status:hasCurrentAiRun?periodLabel:"Before AI optimization",icon:"ϟ",tone:hasCurrentAiRun?"green":"blue"},
     {label:hasCurrentAiRun?"OPTIMIZED HRT":"STARTING HRT",value:hasCurrentAiRun?best?.hrt_hours:baselineSnapshot.hrtHours,unit:"hours",status:hasCurrentAiRun?"Best ranked lower-HRT option":"Before AI optimization",icon:"◷",tone:hasCurrentAiRun?"green":"blue"},
-    {label:"EXTRA BIOGAS",value:hasCurrentAiRun?extraBiogas:0,unit:"m³/day",status:hasCurrentAiRun?"Above baseline":"No AI gain yet",icon:"↗",tone:"green",positive:true},
-    {label:"H₂S REMOVED",value:hasCurrentAiRun?daily?.h2sRemovedPpm:undefined,unit:"ppm",status:hasCurrentAiRun?"Derived estimate":"Calculated after AI run",icon:"◉",tone:"amber"},
-    {label:"CO₂e AVOIDED",value:hasCurrentAiRun?daily?.estimatedCo2eAvoidedKgDay:undefined,unit:"kg/day",status:hasCurrentAiRun?"Derived estimate":"Calculated after AI run",icon:"♧",tone:"green"},
-    {label:"AI SCENARIOS",value:hasCurrentAiRun?report?.summary.totalRows:0,unit:"model outputs",status:hasCurrentAiRun?(report?.persisted?"Saved in reports":"Available in reports"):"Run AI optimization",icon:"▦",tone:"blue"},
+    {label:"EXTRA BIOGAS",value:hasCurrentAiRun?extraBiogas:0,unit:productionUnit("biogas"),status:hasCurrentAiRun?`Above baseline · ${periodLabel}`:"No AI gain yet",icon:"↗",tone:"green",positive:true},
+    {label:"H₂S REMOVED",value:hasCurrentAiRun?daily?.h2sRemovedPpm:undefined,unit:"ppm",status:hasCurrentAiRun?"Derived concentration estimate":"Calculated after AI run",icon:"◉",tone:"amber"},
+    {label:"CO₂e AVOIDED",value:hasCurrentAiRun?periodValues?.co2e:undefined,unit:productionUnit("co2e"),status:hasCurrentAiRun?periodLabel:"Calculated after AI run",icon:"♧",tone:"green"},
+    {label:"AI SCENARIOS",value:hasCurrentAiRun?report?.summary.totalRows:0,unit:"model outputs",status:hasCurrentAiRun?(report?.persisted?"All lines saved in reports":"All lines available in reports"):"Run AI optimization",icon:"▦",tone:"blue"},
   ];
   const adjustments=best&&start?[
     ["Feed rate",start.feedRate,best.feed_rate_kg_vs_day,"kg VS/day"],
@@ -318,7 +355,8 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
       {message&&<div role="status" className={`ops-message ${message.includes("could not")?"error":""}`}><span>{message}</span><button type="button" aria-label="Dismiss notification" onClick={()=>setMessage("")}>×</button></div>}
 
       {tab==="overview"&&<section className="ops-view ops-overview">
-        <div className="ops-kpi-grid">{kpis.map(item=><article key={item.label} className={`ops-kpi ${item.tone}`}><span className="ops-kpi-icon">{item.icon}</span><div><small>{item.label}</small><b>{item.value===undefined?"—":`${item.positive&&item.value>=0?"+":""}${format(item.value)}`}</b><em>{item.value===undefined?"Run AI optimization":item.unit}</em><span><i/>{item.status}</span></div></article>)}</div>
+        <div className="ops-kpi-period" aria-label="Production total period"><div><b>Production totals</b><span>Choose how the calculated values are summarized</span></div><nav>{(["line","day","month","year"] as KpiPeriod[]).map(period=><button key={period} type="button" aria-pressed={kpiPeriod===period} className={kpiPeriod===period?"active":""} onClick={()=>setKpiPeriod(period)}>{period[0].toUpperCase()+period.slice(1)}</button>)}</nav><small>HRT, H₂S concentration and scenario count do not aggregate.</small></div>
+        <div className="ops-kpi-grid">{kpis.map(item=><article key={item.label} className={`ops-kpi ${item.tone}`}><span className="ops-kpi-icon">{item.icon}</span><div><small>{item.label}</small><b>{item.value===undefined?"—":`${item.positive&&item.value>=0?"+":""}${formatKpi(item.value)}`}</b><em>{item.value===undefined?"Run AI optimization":item.unit}</em><span><i/>{item.status}</span></div></article>)}</div>
         <section className="ops-trend-panel"><header><div><b>Baseline vs AI {metricName}</b><small>Calculated from the latest 2,000-scenario model run</small></div><div className="ops-chart-controls"><div className="ops-metric-tabs">{(["biogas","methane","electricity"] as const).map(item=><button key={item} className={metric===item?"active":""} onClick={()=>setMetric(item)}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div><div className="ops-range-tabs">{(["7D","30D","12M"] as const).map(item=><button key={item} className={trendRange===item?"active":""} onClick={()=>setTrendRange(item)}>{item}</button>)}</div></div></header>{projection?<div className="ops-line-chart"><svg viewBox="0 0 1000 170" role="img" aria-label={`Baseline versus AI ${metricName} trend`} preserveAspectRatio="none"><g className="grid">{[36,75,114,153].map(y=><line key={y} x1="28" x2="972" y1={y} y2={y}/>)}</g><path className="baseline" d={trendPath("baseline")}/><path className="ai" d={trendPath("ai")}/></svg><div className="ops-axis"><span>{trendSource[0]?.label}</span><span>{trendSource[Math.floor(trendSource.length/2)]?.label}</span><span>{trendSource.at(-1)?.label}</span></div></div>:<div className="ops-chart-empty"><span>✦</span><b>Run the AI model to compare baseline and optimized production</b><button onClick={()=>void generate()} disabled={working}>{working?"AI is working…":"Generate 2,000 AI outputs"}</button></div>}<footer><span><i className="baseline"/>Baseline / no AI</span><span><i className="ai"/>AI optimized</span><b>{trendRange==="12M"?metricUnit:metric==="electricity"?"kWh/day":metric==="methane"?"m³ CH₄/day":"m³/day"}</b></footer></section>
         <div className="ops-mid-grid">
           <section className="ops-process-card"><header><b>Process Stability</b><small>Model estimate</small></header><div className="ops-process-body"><div className="ops-stability" style={{"--score":`${daily?.processStabilityEstimatePct||0}%`} as CSSProperties}><span><b>{daily?format(daily.processStabilityEstimatePct):"—"}</b><small>/ 100</small></span></div><dl>{best?<><div><dt>pH</dt><dd>{format(best.ph)} ✓</dd></div><div><dt>Temperature</dt><dd>{format(best.temperature_c)} °C ✓</dd></div><div><dt>OLR</dt><dd>{format(best.olr_kg_vs_m3_day)} ✓</dd></div><div><dt>HRT</dt><dd>{format(best.hrt_hours)} hours ✓</dd></div><div><dt>Feed rate</dt><dd>{format(best.feed_rate_kg_vs_day)} ✓</dd></div></>:<div><dt>Status</dt><dd>Waiting for model</dd></div>}</dl></div>
@@ -1317,3 +1355,4 @@ function SettingsModal({settings,message,onChange,onSave,onClose}:{settings:Admi
 }
 
 function format(value:number){return Math.abs(value)>=100?value.toFixed(0):Math.abs(value)>=10?value.toFixed(1):value.toFixed(2)}
+function formatKpi(value:number){return Math.abs(value)>=1000?Math.round(value).toLocaleString("en-US"):format(value)}
