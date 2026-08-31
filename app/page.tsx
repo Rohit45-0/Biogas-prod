@@ -196,6 +196,7 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
   const [trendRange,setTrendRange]=useState<"7D"|"30D"|"12M">("30D");
   const [message,setMessage]=useState("");
   const [afterRunTab,setAfterRunTab]=useState<OperationsTab>("overview");
+  const [userMenuOpen,setUserMenuOpen]=useState(false);
 
   useEffect(()=>{void (async()=>{
     try{
@@ -218,6 +219,12 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
       return()=>window.clearTimeout(timer);
     }
   },[working,paused,stage,pendingReport,stages.length,afterRunTab]);
+
+  useEffect(()=>{
+    if(!message)return;
+    const timer=window.setTimeout(()=>setMessage(""),9000);
+    return()=>window.clearTimeout(timer);
+  },[message]);
 
   async function generate(returnTo:OperationsTab="overview"){
     if(working)return;
@@ -286,6 +293,12 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
     {label:"ANALYTICS",items:[["workflow","⌁","Process Monitor"],["optimizer","✦","AI Optimizer"],["trends","⌁","Trends & Analytics"],["reports","▤","AI & KPI Reports"],["explorer","⌕","Scenario Explorer"],...(auth.role==="admin"?[["audit","✓","Model Audit"] as [OperationsTab,string,string]]:[])]},
     {label:"SYSTEM",items:[["alarms","△","Alerts"],["assets","◇","Data Sources"],["settings","⚙","Settings"]]},
   ];
+  const userControl=<div className="ops-user-menu">
+    <button type="button" className="ops-user-trigger" aria-expanded={userMenuOpen} onClick={()=>setUserMenuOpen(open=>!open)}>
+      <b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role} operator</small></span><i>⌄</i>
+    </button>
+    {userMenuOpen&&<div className="ops-user-dropdown"><div><b>{auth.username}</b><small>Signed in as {auth.role}</small></div><button type="button" onClick={()=>{setUserMenuOpen(false);onLogout();}}>↪ Log out</button></div>}
+  </div>;
 
   return <main className="ops-shell">
     <aside className="ops-sidebar">
@@ -296,8 +309,8 @@ function OperationsDashboard({auth,onLogout,onSettings}:{auth:AuthUser;onLogout:
     </aside>
 
     <section className="ops-main">
-      {(tab==="biogas"||tab==="methane"||tab==="electricity")?<header className="ops-header methane-app-header"><div><span>Production Center</span><i>/</i><b>{tab==="biogas"?"Biogas Dashboard":tab==="methane"?"Methane Dashboard":"Electricity Dashboard"}</b></div><div><span className="ops-status"><i/>MODEL SYSTEM NORMAL</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role} operator</small></span></div></div></header>:<header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1></div><div><span className="ops-status"><i/>MODEL ONLINE</span><span className="ops-status warning"><i/>PLC NOT CONNECTED</span><button className="ops-ai-status" onClick={()=>setTab("workflow")}>◎ AI SUPERVISED OPTIMIZATION</button><button className="ops-run-button" onClick={()=>void generate(tab==="source"?tab:"overview")} disabled={working}>{working?"AI OPTIMIZING…":"RUN AI OPTIMIZATION"}</button><span className="ops-sync">Last run: {report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run"}</span><span className="ops-bell">♢<b>{alerts.length}</b></span><div className="ops-user"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div></div></header>}
-      {message&&<div className={`ops-message ${message.includes("could not")?"error":""}`}>{message}</div>}
+      {(tab==="biogas"||tab==="methane"||tab==="electricity")?<header className="ops-header methane-app-header"><div><span>Production Center</span><i>/</i><b>{tab==="biogas"?"Biogas Dashboard":tab==="methane"?"Methane Dashboard":"Electricity Dashboard"}</b></div><div><span className="ops-status"><i/>MODEL SYSTEM NORMAL</span><span className="ops-bell">♢<b>{alerts.length}</b></span>{userControl}</div></header>:<header className="ops-header"><div><h1>AQUAIVOLT <span>— AI Wastewater-to-Energy Command Center</span></h1></div><div><span className="ops-status"><i/>MODEL ONLINE</span><span className="ops-status warning"><i/>PLC NOT CONNECTED</span><button className="ops-ai-status" onClick={()=>setTab("workflow")}>◎ AI SUPERVISED OPTIMIZATION</button><button className="ops-run-button" onClick={()=>void generate(tab==="source"?tab:"overview")} disabled={working}>{working?"AI OPTIMIZING…":"RUN AI OPTIMIZATION"}</button><span className="ops-sync">Last run: {report?new Date(report.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"Not run"}</span><span className="ops-bell">♢<b>{alerts.length}</b></span>{userControl}</div></header>}
+      {message&&<div role="status" className={`ops-message ${message.includes("could not")?"error":""}`}><span>{message}</span><button type="button" aria-label="Dismiss notification" onClick={()=>setMessage("")}>×</button></div>}
 
       {tab==="overview"&&<section className="ops-view ops-overview">
         <div className="ops-kpi-grid">{kpis.map(item=><article key={item.label} className={`ops-kpi ${item.tone}`}><span className="ops-kpi-icon">{item.icon}</span><div><small>{item.label}</small><b>{item.value===undefined?"—":`${item.positive&&item.value>=0?"+":""}${format(item.value)}`}</b><em>{item.value===undefined?"Run AI optimization":item.unit}</em><span><i/>{item.status}</span></div></article>)}</div>
