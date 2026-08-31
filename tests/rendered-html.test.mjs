@@ -36,6 +36,9 @@ test("builds the data-backed SCADA operations dashboard", async () => {
   assert.match(page, /AI SCENARIOS/);
   assert.match(page, /Saved report history/);
   assert.match(page, /Full recommendation and all scenario evidence are in Reports/);
+  assert.match(page, /Biogas Production Optimization Dashboard/);
+  assert.match(page, /AI vs Baseline Biogas Performance/);
+  assert.match(page, /Online Biogas Feed/);
   assert.match(page, /Approve AI setpoints/);
   assert.match(page, /RUN AI OPTIMIZATION/);
   assert.match(page, /2,000 new deterministic optimization calculations/);
