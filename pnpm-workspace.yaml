@@ -3,8 +3,10 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   workerd: true
+  onnxruntime-node: true
 onlyBuiltDependencies:
   - esbuild
   - sharp
   - unrs-resolver
   - workerd
+  - onnxruntime-node

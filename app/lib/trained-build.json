@@ -1,0 +1,13 @@
+{
+  "sourceHash": "sha256:e1371360a80be97467c538b3267d866c37f196c728244085ee7194362cdc411e",
+  "files": {
+    "app/lib/ml-contract.ts": "3a37d681fa95cf51959b2e3862921018a81bf42d5145dc76c5691ad35c8e70b4",
+    "app/lib/ml-runtime.ts": "64b00bc8d12a5b101eda1dd9f02ed2bcdd645b39d67c6f2fd2842f44c6d0e577",
+    "app/lib/ml-execution.ts": "3ecf561c34cb6df1883d2ebe579e9614725be5b6dc12bcc565be51ee20344b42",
+    "app/lib/ml-manifest.ts": "e4d2f47a83f761baf3ad5ac7e8de406e14e6d6fc64e7138f07c2c2783e26300f",
+    "app/lib/inputs.ts": "58558acddc4daf5e97399ceaa51a872493711103730b9307210f4978f599402b",
+    "app/api/ml/predict/route.ts": "8fbd74611c9d817dde933ad6316f3168bd826f986ddc6bcc3ff2f125c9022062",
+    "app/api/ml/verify/route.ts": "fd58adf08068dc3a36b5276d2a9981fd0a3939f9d3c3456b007af11ea416f32a",
+    "ai-workflow/models/onnx/manifest.json": "f7f2ad1ae41820d98890a1601ef93fa175dc53d397a2c62a57279a2b530118ca"
+  }
+}

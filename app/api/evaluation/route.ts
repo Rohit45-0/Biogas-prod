@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "../../lib/auth";
 import { evaluationEvidence } from "../../lib/evaluation";
+import {manifestHash,manifest} from "../../lib/manifest";
 
 function hex(bytes: ArrayBuffer) {
   return Array.from(new Uint8Array(bytes)).map((value) => value.toString(16).padStart(2, "0")).join("");
@@ -14,15 +15,17 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       ...evaluationEvidence,
+      activeModel:manifest.model,
+      activeManifestHash:manifestHash,
+      currentBuildValidated:false,
       manifestFingerprint,
       liveEvidence: {
         inferenceEndpoint: "POST /api/predict",
         modelCardEndpoint: "GET /api/model",
         evaluationEndpoint: "GET /api/evaluation",
         auditEndpoint: "GET /api/audit",
-        kpiReportEndpoint: "GET/POST /api/reports/kpi",
-        implementation: "LangGraph StateGraph orchestration + exported TypeScript Ridge inference",
-        deterministic: true,
+        implementation: "Server-side TypeScript inference service",
+        deterministicWithFixedSeed: true,
       },
       generatedAt: new Date().toISOString(),
     },

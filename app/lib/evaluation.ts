@@ -1,49 +1,72 @@
-import manifest from "./model-evaluation.generated.json";
-
-type TargetMetrics = { mae:number; rmse:number; r2:number };
-type Candidate = { id:string; label:string; normalizedMae:number; targets:Record<string,TargetMetrics>; artifact:string; artifactSha256:string };
-
-const candidates=manifest.evaluation.models as Candidate[];
-const deployed=candidates.find((item)=>item.label===manifest.selection.deployedModel) ?? candidates[0];
-
 export const evaluationEvidence = {
-  evaluationDate: manifest.generatedAt.slice(0,10),
-  purpose: "Reproducible short-HRT comparison using the supplied 500-row synthetic research workbook",
-  evaluatedModels: candidates.map((item)=>item.label),
-  designs: [
-    { name: "Short-HRT 5-fold cross-validation", trainRows: 400, testRows: 100, repeats: 5, note: manifest.evaluation.method },
+  evaluationDate: "2026-08-19",
+  purpose: "Historical evaluation archive; not rerun or verified for the current deployed build",
+  status: "ARCHIVED - NOT CURRENT-BUILD VALIDATION",
+  evaluatedModels: [
+    "Mean baseline",
+    "Ridge regression",
+    "K-nearest neighbours",
+    "Random forest",
+    "Extra Trees",
+    "Gradient boosting",
+    "Small multilayer perceptron neural network",
+    "Current scenario ensemble with bounded optimizer",
   ],
-  optimizationAnchorResults: candidates.map((item)=>({
-    model:item.label,
-    nmae:item.normalizedMae,
-    gasMae:item.targets.biogas.mae,
-    methaneMae:item.targets.methane.mae,
-    powerMae:item.targets.electricity.mae,
-    role:item.id==="ridge_polynomial"?"Deployed, portable exported-coefficient model":"Evaluated candidate; saved artifact retained for audit",
-    artifact:item.artifact,
-    artifactSha256:item.artifactSha256,
-  })),
-  scadaHoldoutResults: [] as { model:string;nmae:number }[],
+  designs: [
+    { name: "SCADA chronological holdout", trainRows: 800, testRows: 200, note: "SCADA data template; later rows kept out of training" },
+    { name: "Optimization-anchor leave-one-out", trainRows: 9, testRows: 1, repeats: 10, note: "One of ten paired scenarios excluded in every fold" },
+    { name: "Literature-projection stress test", trainRows: 10, testRows: 3, note: "Agreement with engineering projections, not field validation" },
+  ],
+  optimizationAnchorResults: [
+    { model: "Gradient boosting", nmae: 0.615, gasMae: 9.58, methaneMae: 1.38, powerMae: 3.94, role: "Lowest fair aggregate error" },
+    { model: "Current scenario ensemble", nmae: 0.637, gasMae: 9.86, methaneMae: 1.52, powerMae: 3.81, role: "Deployed prototype model" },
+    { model: "Ridge regression", nmae: 0.725, gasMae: 14.85, methaneMae: 0.98, powerMae: 5.51, role: "Linear comparison" },
+    { model: "Extra Trees", nmae: 0.746, gasMae: 13.53, methaneMae: 1.37, powerMae: 5.11, role: "Tree-ensemble comparison" },
+    { model: "K-nearest neighbours", nmae: 0.749, gasMae: 14.84, methaneMae: 1.14, powerMae: 5.47, role: "Local-pattern comparison" },
+    { model: "Random forest", nmae: 0.902, gasMae: 17.41, methaneMae: 1.49, powerMae: 6.38, role: "Bagged-tree comparison" },
+    { model: "Mean baseline", nmae: 0.914, gasMae: 15.96, methaneMae: 1.87, powerMae: 5.87, role: "No-feature reference" },
+    { model: "Small neural network", nmae: 5.956, gasMae: 51.24, methaneMae: 23.24, powerMae: 20.54, role: "Rejected for severe overfit" },
+  ],
+  scadaHoldoutResults: [
+    { model: "Mean baseline", nmae: 0.834 },
+    { model: "Ridge regression", nmae: 0.835 },
+    { model: "Random forest", nmae: 0.839 },
+    { model: "Gradient boosting", nmae: 0.839 },
+    { model: "Extra Trees", nmae: 0.847 },
+    { model: "K-nearest neighbours", nmae: 0.900 },
+    { model: "Current scenario ensemble", nmae: 1.039 },
+    { model: "Small neural network", nmae: 1.214 },
+  ],
   selection: {
-    numericalWinner: manifest.selection.numericalWinner,
-    numericalWinnerNmae: manifest.selection.numericalWinnerNormalizedMae,
-    deployedModel: manifest.selection.deployedModel,
-    deployedModelNmae: manifest.selection.deployedModelNormalizedMae,
-    reason: manifest.selection.reason,
-    neuralNetworkDecision: "A neural network/PyTorch model is not deployed or claimed. The supplied 500 synthetic rows are insufficient evidence to promote one over the evaluated models.",
-    approvalRequired: manifest.selection.approvalRequired,
+    numericalWinner: "Gradient boosting",
+    numericalWinnerNmae: 0.615,
+    deployedModel: "Current scenario ensemble with bounded optimizer",
+    deployedModelNmae: 0.637,
+    reason: "Comparable leave-one-out error plus support for all nine application inputs, deterministic core inference, traceable bounded exploration and controlled extrapolation",
+    neuralNetworkDecision: "Rejected because it overfit the small-data comparisons and extrapolated unstably",
   },
   dataAudit: {
-    shortHrtRows: manifest.source.rowCount,
-    candidateModels: candidates.length,
-    validationFolds: 5,
-    realPlantRows: 0,
+    scadaUniqueRows: 1000,
+    optimizationAnchors: 10,
+    normalValidationRuns: 10,
+    literatureProjectionRows: 3,
     projectedRowsUsedForTraining: false,
-    sourceClassification: manifest.source.classification,
-    missingCoverage: "No timestamped real-plant outcome data was supplied. Daily/monthly actual KPI totals require CSV import or future IoT/SCADA ingestion.",
+    sourceClassification: "Research-informed and projected data; the supplied workbooks do not identify synchronized measurements from an operating Aquaivolt plant",
+    missingCoverage: "No single supplied table contains all nine application inputs together with measured output targets",
   },
-  runtime: manifest.runtime,
-  limitations: manifest.limitations,
+  evidenceFiles: [
+    "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template.xlsx",
+    "AQUAIVOLT_AI_Biogas_10_Run_Dataset.xlsx",
+    "AQUAIVOLT_10_Biogas_Optimization_10Scenarios.xlsx",
+    "AQUAIVOLT_Projected_Scenarios_HRT_below6h_500.xlsx",
+    "AQUAIVOLT hours-scale 500-row HRT data workbook",
+    "10 more cases with days less in HRT on ai and on litterature.xlsx",
+  ],
+  limitations: [
+    "The present results do not establish real-plant predictive accuracy.",
+    "Coverage is an input-space measure, not calibrated statistical confidence.",
+    "Out-of-range values are controlled estimates from nearest supplied patterns.",
+    "Recommendations require human review and do not control equipment.",
+    "These historical results do not validate the current model build. Current software tests and storage evidence are separate.",
+  ],
 } as const;
-
-export const deployedEvaluation = deployed;

@@ -1,88 +1,173 @@
 # Aquaivolt AI Biogas Command Center
 
-An auditable short-HRT biogas scenario prototype. A signed-in user enters feed rate, temperature, pH, OLR and HRT in hours; the server invokes an implemented **LangGraph StateGraph**, runs the trained 2–24 hour model and returns an input-responsive baseline, biogas, methane and electricity estimates, recommendations, input-response curves and an execution trace.
+[![Verify AI workflow](https://github.com/Rohit45-0/Biogas-prod/actions/workflows/verify-ai-workflow.yml/badge.svg)](https://github.com/Rohit45-0/Biogas-prod/actions/workflows/verify-ai-workflow.yml)
 
-This is a **scenario model**, not a live SCADA connection and not an equipment controller. The supplied data are research-informed, synthetic/projected and must not be presented as operating-plant validation.
+This repository contains the Aquaivolt biogas dashboard, its server-side prediction logic, the executable LangGraph technical proof, saved machine-learning artifacts, model evaluation results and audit evidence.
 
-## Run locally — simple Windows steps
+**Live dashboard:** [aquaivolt-command-center.vercel.app](https://aquaivolt-command-center.vercel.app/)
 
-For a client demonstration, only **Node.js 22 LTS** is required. Git is required only when cloning from GitHub. Python, Vercel, VS Code, Excel and an OpenAI subscription are **not** required to run the dashboard.
+**Client installation guide:** [Run the current dashboard locally](CLIENT_QUICK_START.md). Start here for Windows installation, local account setup, Audit Trail checks and troubleshooting.
 
-1. Install [Node.js 22 LTS](https://nodejs.org/en/download) using the default options.
-2. Download the repository ZIP from GitHub (or clone it with Git), then extract it.
-3. Double-click [`START_AQUAIVOLT.bat`](START_AQUAIVOLT.bat).
-4. On first use, Notepad opens `.env.local`. The supplied local login details already work; save and close Notepad.
-5. Wait for the first-time package installation. The dashboard opens automatically at `http://localhost:3000`.
+**Current audit instructions and architecture:** [Audit Trail 1.8.0](docs/AUDIT_TRAIL.md). Earlier diagrams and presentations describe historical versions and should not be treated as a current deployment manifest.
 
-For a copy-and-paste GitHub option, see [`CLIENT_QUICK_START.md`](CLIENT_QUICK_START.md). The dashboard can run with `OPENAI_API_KEY` left blank; that key only enables optional OpenAI-enhanced Copilot answers.
+## What happens when the user calculates production?
 
-## Durable report storage with Supabase
+```text
+Nine plant inputs
+      ↓
+Authentication and validation
+      ↓
+Multi-input scenario inference
+      ↓
+Biogas, methane, electricity and carbon calculations
+      ↓
+Setpoint search and recommendations
+      ↓
+Charts, explanation and auditable execution ID
+```
 
-The dashboard works without Supabase, but records are then volatile in a serverless deployment. To persist each completed run as an auditor-readable report:
+The dashboard considers:
 
-1. In Supabase SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql).
-2. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` or the Vercel project environment.
-3. Restart/redeploy the application.
+1. Feedstock type
+2. Feed rate
+3. Temperature
+4. pH
+5. Organic loading rate
+6. Hydraulic retention time
+7. COD input
+8. VFA
+9. Mixer speed
 
-The service-role key is used only by server routes. It must never be placed in a `NEXT_PUBLIC_` variable, browser code, Git history or a client presentation. The saved `simulation_runs` row holds the authenticated operator, submitted inputs, complete model outputs, recommendations and execution trace. The `kpi_observations` table separately records **modelled predictions** and timestamped **CSV imports** so a report cannot silently label a model calculation as a plant meter reading. Tables have RLS enabled with no browser policy, so the app's server is the only writer/reader.
+## Where is the AI/model code?
 
-## Implemented AI workflow
+| Component | Location | Purpose |
+|---|---|---|
+| Deployed prediction API | [`app/api/predict/route.ts`](app/api/predict/route.ts) | Authenticated input contract and run persistence |
+| Overview scenario engine | [`app/lib/model.ts`](app/lib/model.ts) | Reference-anchor inference and 2,000-candidate seeded search |
+| Trained ML prediction API | [`app/api/ml/predict/route.ts`](app/api/ml/predict/route.ts) | Audit Trail: actual Ridge and Gradient Boosting predictions |
+| Trained ML runtime | [`app/lib/ml-runtime.ts`](app/lib/ml-runtime.ts) | Hash-checked ONNX CPU inference using the saved fitted pipelines |
+| Audit Trail | [`app/components/AuditTrail.tsx`](app/components/AuditTrail.tsx) | Execution, reproducibility, comparison and record retrieval |
+| Private audit storage | [`app/lib/audit.ts`](app/lib/audit.ts) | Signed records in private Vercel Blob with readback verification |
+| LangGraph workflow | [`ai-workflow/src/aquaivolt_langgraph_backend.py`](ai-workflow/src/aquaivolt_langgraph_backend.py) | Executable nine-node technical workflow |
+| Saved ML artifacts | [`ai-workflow/models`](ai-workflow/models) | Gradient Boosting and Ridge pipelines |
+| Model comparison | [`ai-workflow/evaluation`](ai-workflow/evaluation) | Evaluation results and limitations |
+| Reproducible evidence | `ai-workflow/run-evidence/latest_run.json` (generated when the Python workflow runs) | Inputs, outputs, node trace and model hashes |
+| Copilot RAG | [`app/api/copilot/route.ts`](app/api/copilot/route.ts) | Answers questions using project evidence and current scenario context |
+| Technical audit guide | [`docs/AUDIT_TRAIL.md`](docs/AUDIT_TRAIL.md) | Current endpoints, model contracts and audit checks |
 
-`POST /api/predict` executes this LangGraph graph on the server:
+## LangGraph workflow
 
-1. Validate five inputs and flag explicit out-of-envelope estimates.
-2. Prepare standardized degree-2 polynomial features.
-3. Run the exported Ridge-regression coefficients.
-4. Calculate an input-responsive baseline; the source baseline column is constant, so this is not represented as a separate trained model.
-5. Search 3,125 bounded nearby lower-HRT candidates, retaining choices that protect biogas, methane and electricity.
-6. Apply the methane/H₂S safety and human-approval gate.
-7. Prepare an execution trace and persist audit/KPI evidence where Supabase is configured.
+The Python workflow genuinely executes these nodes:
 
-The workflow is advisory only: it does not read IoT data, write to PLCs, or control feed, heating, mixing, valves or generator equipment.
+```text
+START
+  → Validate request
+  → Engineer model features
+  → Load and hash saved models
+  → Run Gradient Boosting and Ridge
+  → Select the evaluated candidate
+  → Derive daily production metrics
+  → Search 400 bounded operating scenarios
+  → Add safety explanation
+  → Persist JSON audit evidence
+  → END
+```
 
-## Reproducible model training and comparison
+![LangGraph backend flow](ai-workflow/assets/langgraph-backend-flow.png)
 
-Run this on a development machine with Python 3.12+ to reproduce the saved artifacts and evaluation manifest:
+### Important implementation statement
+
+- The **overview endpoint `/api/predict`** uses the server-side TypeScript scenario ensemble.
+- The **Audit Trail endpoint `/api/ml/predict`** executes both saved Gradient Boosting and Ridge pipelines, exported to ONNX, with the fitted encoders, scalers and learned weights intact. Conversion was checked against Python predictions on 674 cases per model. No retraining or reference-engine fallback is used.
+- The **LangGraph workflow** is an executable technical proof around saved scikit-learn models.
+- LangGraph orchestration itself is not called by either Vercel endpoint; the trained artifacts now execute directly in the Node API through ONNX Runtime.
+- PyTorch is not used. A small scikit-learn neural-network candidate was evaluated and rejected because it overfit the small supplied dataset.
+- Core calculations are deterministic; each Vercel run seeds a bounded 2,000-candidate search and records the highest-scoring candidate in its audit trace. Same inputs and seed reproduce outputs.
+
+## Run only the AI workflow on Windows
+
+Install [Python 3.12](https://www.python.org/downloads/), download this repository and double-click:
+
+```text
+ai-workflow/RUN_AI_WORKFLOW.bat
+```
+
+The first run creates a local environment, installs the required libraries, executes the sample input and writes a new JSON file under `ai-workflow/run-evidence`.
+
+Manual command:
 
 ```powershell
 cd ai-workflow
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python train_short_hrt_model.py
+python -m pip install -r requirements.txt
+python src/aquaivolt_langgraph_backend.py --input sample_input.json --output-dir run-evidence
+python tests/test_workflow.py
 ```
 
-The script uses the supplied `AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx` workbook, **Hours-Scale AI Synthetic 500** sheet. It evaluates Ridge regression with quadratic features, HistGradientBoosting and XGBoost with the same fixed shuffled five-fold cross-validation. Model artifacts are saved in `ai-workflow/artifacts/` and the evaluator produces `app/lib/model-evaluation.generated.json`. The deployed model is Ridge because it is the numerical winner and can be reproduced in the Vercel TypeScript runtime with exported coefficients. A neural-network/PyTorch model is not implemented or claimed.
+Expected reproducibility checks:
 
-## Reproducible AI reports
+- Identical input returns identical model metrics.
+- Gradient Boosting is selected from the saved comparison.
+- The optimizer evaluates 400 bounded candidates.
+- All nine workflow nodes appear in the trace.
 
-The main Overview places the manual calculation first and the **Batch AI + KPI report** immediately below it. Any signed-in operator can inspect a paused, auditor-controlled batch workflow before explicitly generating the report. The primary report mode uses the supplied 500-row `Hours-Scale AI Synthetic 500` worksheet as a batch of **operating inputs**:
+## Run the dashboard locally
 
-- The app embeds only the five input columns—feed rate, temperature, pH, OLR and **HRT in hours**—from the supplied 500-row sheet. The workbook's optimized-output columns are deliberately excluded from runtime inference.
-- Four deterministic, bounded candidate profiles are generated for each source row, so one batch operation produces **500 × 4 = 2,000 new model evaluations**.
-- Each generated candidate is passed through the portable `StandardScaler → degree-2 polynomial features → Ridge regression` model. It was fitted from the same 500-row synthetic research worksheet (HRT 2–24 hours).
-- Ridge, HistGradientBoosting and XGBoost are evaluated using a fixed shuffled five-fold cross-validation. Its output is constrained to the observed synthetic-data envelope; it is therefore a repeatable research estimate, not a claim of field performance.
-- No random-number generator and no Excel target/output lookup is used at runtime. The source inputs and the trained model coefficients are versioned in the application.
-- Ranking uses an explicit HRT-aware multi-output score. The report includes source row ID, candidate profile, input setpoints, baseline, model output, H₂S calculation and scenario-specific recommendation.
-- The supplied short-HRT baseline column is constant, so the dashboard’s current baseline is transparently calculated as an input-responsive counterfactual rather than falsely presented as a separately trained baseline model.
-- The report creates thirty deterministic **modelled operating-day groups**, plus a **30-day monthly-equivalent** and **365-day annualised** projection. The workbook has no calendar timestamps, so these values are never labelled as measured daily/monthly/yearly plant totals.
-- Downloadable reporting includes the 2,000 scenario audit rows, a 30-day modelled projection CSV and the monthly/yearly projection summary.
-- H₂S removal is a derived before/after estimate. CO₂e avoidance uses the documented 0.708 kg/kWh electricity-displacement assumption; it is not a direct CO₂-removal measurement.
-- The short-HRT model remains clearly marked synthetic research data and is not site-validated.
+Follow [CLIENT_QUICK_START.md](CLIENT_QUICK_START.md). Use Node.js 24 LTS (minimum 22.13) and the pinned pnpm 11.25.0 package manager. Install the locked dependencies with:
 
-Batch report metadata is saved to `simulation_runs` immediately, so it works with the existing Supabase schema. Once the current [`supabase/schema.sql`](supabase/schema.sql) is applied, the app automatically uses the dedicated `batch_reports` table instead.
+```powershell
+npm.cmd install --global pnpm@11.25.0
+pnpm.cmd install --frozen-lockfile
+```
 
-## Verification
+Create `.env.local` from `.env.example`, generate a private session secret and replace both password placeholders. Then start the dashboard with:
 
-Run `pnpm test` for the production build and checks. After a prediction, an administrator can open **Model audit** to inspect the same execution ID, real LangGraph model trace, data-source note, evaluation evidence and persisted run log. **KPI reports** provides hour/day/month aggregation of source-labelled modelled records or separately imported CSV records.
+```powershell
+pnpm.cmd dev --webpack --hostname 127.0.0.1 --port 3000
+```
 
-## Key routes
+After completing the first-time setup, the Windows launcher performs the same startup:
 
-- `POST /api/predict` — validates five short-HRT inputs, runs the trained model and records the report.
-- `GET /api/audit` — administrator-only report history; append `?format=csv` for export.
-- `GET /api/model` and `GET /api/evaluation` — model card and evaluation evidence.
-- `POST /api/copilot` — source-grounded assistance, optionally enhanced with OpenAI when configured.
-- `POST /api/reports/batch` — authenticated, on-demand batch generator. `short_hrt_batch` produces exactly 2,000 model-derived rows from the embedded 500-row operating-input batch.
-- `GET /api/reports/batch?id=<report-id>&format=csv` — recreates and downloads the saved batch definition; use `format=daily` for the 30-day modelled projection and `format=projection` for the modelled monthly-equivalent and annualised summary.
-- `GET /api/reports/kpi?period=hour|day|month` — administrator-only source-labelled KPI aggregation; supports `source=modelled_prediction|csv_import`.
-- `POST /api/reports/kpi` — administrator-only timestamped CSV/API KPI import; the records are stored as `csv_import` and never silently mixed with modelled output.
+```text
+START_DASHBOARD.bat
+```
+
+Configure the placeholder usernames, passwords and session secret from `.env.example` in `.env.local` before starting. No demo passwords are supplied. Local audit evidence uses the explicitly configured `AQUA_AUDIT_DIR`; production requires a linked private Blob store and its server-only `BLOB_READ_WRITE_TOKEN`.
+
+The OpenAI API key is optional. Leave it blank for local setup. Without it, Copilot uses the built-in keyword fallback. Python is not needed to run the dashboard's exported trained models. Never commit a real password, API key or deployment token. Local passwords and local audit records are independent of the production deployment.
+
+## Historical model evaluation
+
+On the ten supplied optimization anchors, Gradient Boosting produced the lowest saved aggregate leave-one-out error and was retained for the technical proof. The deployed scenario ensemble remained close and is easier to explain for the prototype dashboard. Full metrics are in [`COMPARISON_REPORT.md`](ai-workflow/evaluation/COMPARISON_REPORT.md).
+
+These archived evaluation scores have not been rerun against model version 1.8.0. The supplied workbooks are research-informed scenario and projected data, not synchronized measurements from an operating plant. They demonstrate the system but do not establish real-plant prediction accuracy. Production validation requires timestamped site measurements and an untouched test period.
+
+## Trained ML in Audit Trail
+
+Admin -> Audit Trail -> ML predictions. Submit explicit operating conditions to execute both trained models, export their actual predictions and signed evidence, and replay a stored run with **Verify ML run**. No OpenAI API call is required for these predictions.
+
+- Gradient Boosting: `best_10_anchor_model.joblib`, six input features, fitted on 10 reference rows. Its targets are the reference dataset's after-AI outputs.
+- Ridge: `best_scada_tabular_model.joblib`, eight input features, fitted on the 800-row training split of the SCADA template.
+- Neither fitted model uses feed rate. VFA and mixer speed are used by Ridge only. Unused request values are explicitly recorded as context.
+- These are different models/datasets/target definitions, not a before/after pair. A larger prediction does not identify a better model or demonstrate an optimization gain.
+- Exported pipelines live in `ai-workflow/models/onnx`. Source and exported artifact hashes, feature mappings, original-Python parity checks and archived evaluation are exposed in the ML manifest. HRT is in days.
+- Matching the saved Python models proves conversion fidelity, not plant accuracy. Archived Ridge R2 values are near zero or negative and should not be portrayed as strong validation.
+
+Export reproduction and runtime tests are documented in [`ai-workflow/README.md`](ai-workflow/README.md).
+
+## Presentation explanation
+
+> The overview uses a reference-based scenario engine and a 2,000-candidate search. The Admin Audit Trail additionally executes the saved Ridge and Gradient Boosting pipelines at a separate ML endpoint. Both paths return explicit inputs, outputs, execution traces, model/build hashes, run IDs and confirmed storage status. Trained ML predictions and scenario optimization estimates are clearly separated. Independent plant validation remains outstanding.
+
+## Repository map
+
+```text
+app/                 Next.js dashboard and Vercel API routes
+ai-workflow/         LangGraph code, models, tests and run evidence
+docs/                Architecture diagram and technical evidence document
+public/              Dashboard assets
+tests/               Application verification tests
+```
+
+## Safety and limitations
+
+This is a decision-support prototype. It does not read physical sensors or automatically operate valves, mixers, heaters or generators. All recommended changes require plant-operator review.

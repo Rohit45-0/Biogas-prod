@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "../../lib/auth";
 import { modelCard, modelMetadata } from "../../lib/system";
-import { shortHrtModelMetadata } from "../../lib/short-hrt-model";
+import {manifest,manifestHash} from "../../lib/manifest";
+import {mlManifest,mlManifestHash} from "../../lib/ml-manifest";
 
 export async function GET(request: Request) {
   const session = await getSession(request);
@@ -9,8 +10,9 @@ export async function GET(request: Request) {
   return NextResponse.json({
     model: modelMetadata,
     card: modelCard,
-    shortHrtModel: shortHrtModelMetadata,
     endpoint: "/api/predict",
+    manifest, manifestHash,
+    trainedMl:{endpoint:"/api/ml/predict",manifest:mlManifest,manifestHash:mlManifestHash,access:"admin",runtimeStatus:"Check authenticated GET /api/ml/predict for actual artifact load status"},
     generatedAt: new Date().toISOString(),
-  });
+  },{headers:{"Cache-Control":"no-store"}});
 }

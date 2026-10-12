@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/audit-evidence/
+/test-results/
+/.audit-test-data/
 
 # next.js
 /.next/
@@ -28,7 +31,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (the safe, non-secret template is deliberately committed)
+# env files (can opt-in for committing if needed)
 .env*
 !.env.example
 
@@ -41,6 +44,8 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
-
-# local Python model-training environment
 /ai-workflow/.venv/
+/ai-workflow/test-evidence/
+/ai-workflow/run-evidence/
+__pycache__/
+*.pyc

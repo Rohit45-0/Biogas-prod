@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./fixes.css";
 export const metadata:Metadata={
-  metadataBase:new URL("https://aquaivolt-command-center.barshilerohit1785.chatgpt.site"),
+  metadataBase:new URL("https://aquaivolt-command-center.vercel.app"),
   title:"Aquaivolt AI Biogas Command Center",
   description:"Model-driven biogas prediction, baseline optimization evidence, simulated IoT monitoring and persistent audit trails.",
   openGraph:{title:"Aquaivolt AI Biogas Command Center",description:"Predict · Optimize · Audit",images:[{url:"/og.png",width:1733,height:908,alt:"Aquaivolt AI Biogas Command Center"}]},

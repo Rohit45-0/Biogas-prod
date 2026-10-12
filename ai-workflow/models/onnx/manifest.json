@@ -1,0 +1,231 @@
+{
+  "version": "trained-ml-1.0.0",
+  "runtime": "ONNX Runtime CPU",
+  "export": {
+    "scikitLearn": "1.9.0",
+    "skl2onnx": "1.20.0",
+    "onnx": "1.23.0",
+    "onnxruntime": "1.23.2"
+  },
+  "parityTolerance": {
+    "absolute": 0.0001,
+    "relative": 1e-06
+  },
+  "trainingProvenance": "Research-informed reference and projected data; not independent plant measurements",
+  "evaluationSourceHash": "sha256:093036b382a08e474326dde9879cd8af2a9d41813b5d9e312ac8674201cec3af",
+  "models": {
+    "gradient_boosting": {
+      "id": "gradient_boosting",
+      "name": "Gradient Boosting",
+      "version": "trained-ml-1.0.0",
+      "filename": "gradient_boosting.onnx",
+      "sourceArtifact": "ai-workflow/models/best_10_anchor_model.joblib",
+      "sourceArtifactHash": "sha256:f705f5c4b2a29870640e425ebd3ef7fcf9cb0cff2923e64ebd5f45bf0433f7a4",
+      "artifactHash": "sha256:51022e0cdcdbc75ed041a04e19c5c45d6f6a6af8f164040a165cd914351519b4",
+      "trainedFeatureCount": 6,
+      "fittedRows": 10,
+      "features": [
+        {
+          "key": "feedstock",
+          "column": "Feedstock",
+          "tensor": "Feedstock",
+          "type": "string"
+        },
+        {
+          "key": "temperature",
+          "column": "Temp (\u00b0C)",
+          "tensor": "Temp___C_",
+          "type": "float64"
+        },
+        {
+          "key": "ph",
+          "column": "pH",
+          "tensor": "pH",
+          "type": "float64"
+        },
+        {
+          "key": "olr",
+          "column": "OLR (kgCOD/m3.d)",
+          "tensor": "OLR__kgCOD_m3_d_",
+          "type": "float64"
+        },
+        {
+          "key": "hrt",
+          "column": "HRT (days)",
+          "tensor": "HRT__days_",
+          "type": "float64"
+        },
+        {
+          "key": "codIn",
+          "column": "COD In (mg/L)",
+          "tensor": "COD_In__mg_L_",
+          "type": "float64"
+        }
+      ],
+      "contextOnly": [
+        "feedRate",
+        "vfa",
+        "mixing"
+      ],
+      "categories": [
+        "Brewery",
+        "Cow Manure",
+        "Dairy WW",
+        "Food Waste",
+        "Mixed Waste",
+        "Paper Mill"
+      ],
+      "targetBasis": "After-AI reference gas flow, methane content and generator power",
+      "trainingData": "10 paired optimization reference rows",
+      "outputName": "variable",
+      "outputKeys": [
+        "gasFlowM3h",
+        "methanePct",
+        "generatorKw"
+      ],
+      "parity": {
+        "caseCount": 674,
+        "maxAbsoluteError": [
+          1.2937270639667986e-05,
+          4.113005232397882e-06,
+          7.742168094182489e-06
+        ],
+        "status": "PASS"
+      },
+      "evaluation": {
+        "status": "ARCHIVED - NOT PLANT VALIDATION",
+        "method": "optimization_anchor_leave_one_out",
+        "results": {
+          "Gas Flow (m3/h) After AI": {
+            "MAE": 9.580741615985056,
+            "RMSE": 12.498821316780761,
+            "R2": 0.5127396702884716
+          },
+          "CH4 (%) After AI": {
+            "MAE": 1.3813286618447436,
+            "RMSE": 1.5372203781889429,
+            "R2": 0.3846233096043342
+          },
+          "Generator (kW) After AI": {
+            "MAE": 3.941674141950366,
+            "RMSE": 4.915750142943742,
+            "R2": 0.4332880049753419
+          },
+          "overall_normalized_MAE": 0.6145360455228502
+        },
+        "source": "ai-workflow/evaluation/model_comparison.json"
+      }
+    },
+    "ridge": {
+      "id": "ridge",
+      "name": "Ridge Regression",
+      "version": "trained-ml-1.0.0",
+      "filename": "ridge.onnx",
+      "sourceArtifact": "ai-workflow/models/best_scada_tabular_model.joblib",
+      "sourceArtifactHash": "sha256:f4bd3000d2b9f394c2dfb3dcec64252f95cdb69a39f2164f83fd838fc6b8228e",
+      "artifactHash": "sha256:8d5c8d68e1a8fb482d340bb719478af4382f1f7fea45cb86187bdef88e364c57",
+      "trainedFeatureCount": 8,
+      "fittedRows": 800,
+      "features": [
+        {
+          "key": "feedstock",
+          "column": "Feedstock",
+          "tensor": "Feedstock",
+          "type": "string"
+        },
+        {
+          "key": "hrt",
+          "column": "HRT_days",
+          "tensor": "HRT_days",
+          "type": "float64"
+        },
+        {
+          "key": "olr",
+          "column": "OLR",
+          "tensor": "OLR",
+          "type": "float64"
+        },
+        {
+          "key": "temperature",
+          "column": "Temp_C",
+          "tensor": "Temp_C",
+          "type": "float64"
+        },
+        {
+          "key": "ph",
+          "column": "pH",
+          "tensor": "pH",
+          "type": "float64"
+        },
+        {
+          "key": "codIn",
+          "column": "COD_In_mgL",
+          "tensor": "COD_In_mgL",
+          "type": "float64"
+        },
+        {
+          "key": "vfa",
+          "column": "VFA_mgL",
+          "tensor": "VFA_mgL",
+          "type": "float64"
+        },
+        {
+          "key": "mixing",
+          "column": "Mixer_RPM",
+          "tensor": "Mixer_RPM",
+          "type": "float64"
+        }
+      ],
+      "contextOnly": [
+        "feedRate"
+      ],
+      "categories": [
+        "Brewery",
+        "Cow Manure",
+        "Dairy WW",
+        "Food Waste",
+        "Paper Mill"
+      ],
+      "targetBasis": "SCADA-template gas flow, methane content and generator power",
+      "trainingData": "SCADA data template; chronological training split",
+      "outputName": "variable",
+      "outputKeys": [
+        "gasFlowM3h",
+        "methanePct",
+        "generatorKw"
+      ],
+      "parity": {
+        "caseCount": 674,
+        "maxAbsoluteError": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "status": "PASS"
+      },
+      "evaluation": {
+        "status": "ARCHIVED - NOT PLANT VALIDATION",
+        "method": "scada_chronological_holdout",
+        "results": {
+          "Gas_Flow_m3h": {
+            "MAE": 91.85007276477012,
+            "RMSE": 107.51525289061773,
+            "R2": -0.01584712125472132
+          },
+          "CH4_pct": {
+            "MAE": 4.079243256003361,
+            "RMSE": 4.718828354308548,
+            "R2": 0.005509374039200043
+          },
+          "Generator_kW": {
+            "MAE": 24.905344779290758,
+            "RMSE": 28.467896149126748,
+            "R2": -0.01690489033620768
+          },
+          "overall_normalized_MAE": 0.8348201719190088
+        },
+        "source": "ai-workflow/evaluation/model_comparison.json"
+      }
+    }
+  }
+}
