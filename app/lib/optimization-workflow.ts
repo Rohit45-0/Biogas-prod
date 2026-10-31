@@ -5,7 +5,7 @@ export const optimizationSteps=[
   {id:"production",title:"Compare production",detail:"Baseline and selected-candidate biogas, methane and electricity calculated."},
   {id:"diagnostics",title:"Calculate KPIs",detail:"Process diagnostics, HRT curves and recommendations calculated."},
   {id:"evidence",title:"Build evidence",detail:"Run identifier, input fingerprints and model evidence assembled."},
-  {id:"storage",title:"Save audit record",detail:"Signed evidence written to persistent storage and read back for verification."},
+  {id:"storage",title:"Save audit record",detail:"Server-authenticated evidence stored and read back for verification."},
   {id:"results",title:"Return results",detail:"Production estimates and recommendations returned to the dashboard."},
 ] as const;
 

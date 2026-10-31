@@ -7,6 +7,8 @@ import {getEvidence,verifyEvidence} from "../../lib/audit";
 import {manifestHash} from "../../lib/manifest";
 import {csvCell} from "../../lib/evidence";
 import type {ModelInput} from "../../lib/inputs";
+import {assessDomain} from "../../lib/domain";
+import {hrtChange} from "../../lib/hrt";
 export const runtime="nodejs";
 export const maxDuration=60;
 
@@ -23,7 +25,11 @@ export async function GET(req:Request){
       const response=record.response as {seed:string;modelName:string;modelVersion:string};
       const rows=searchOptimizationCandidates(record.inputs as ModelInput,response.seed,true).scenarioExport??[];
       const headers=["rank","source_condition","selected","feedstock","feed_rate_kg_vs_d","temperature_c","ph","olr_kg_cod_m3_d","model_hrt_days","hrt_hours","cod_in_mg_l","vfa_mg_l","mixing_rpm","baseline_biogas_m3_d","baseline_methane_m3_d","baseline_electricity_kwh_d","ai_biogas_m3_d","ai_methane_m3_d","ai_methane_pct","ai_electricity_kwh_d","score","run_id","model_name","model_version","manifest_hash","data_role"];
-      const values=rows.map(r=>[r.rank,r.sourceCondition,r.selected,r.feedstock,r.feedRate,r.temperature,r.ph,r.olr,r.hrt,r.hrtHours,r.codIn,r.vfa,r.mixing,r.baselineBiogas,r.baselineMethane,r.baselineElectricity,r.aiBiogas,r.aiMethane,r.methanePct,r.aiElectricity,r.score,id,response.modelName,response.modelVersion,record.manifestHash,"evaluated_optimization_candidate_not_training_data"]);
+      headers.push("hrt_change_hours","hrt_direction","reference_envelope_status","uncertainty_status","warnings_json");
+      const values=rows.map(r=>{
+        const change=hrtChange((record.inputs as ModelInput).hrt*24,r.hrtHours),support=assessDomain(r);
+        return [r.rank,r.sourceCondition,r.selected,r.feedstock,r.feedRate,r.temperature,r.ph,r.olr,r.hrt,r.hrtHours,r.codIn,r.vfa,r.mixing,r.baselineBiogas,r.baselineMethane,r.baselineElectricity,r.aiBiogas,r.aiMethane,r.methanePct,r.aiElectricity,r.score,id,response.modelName,response.modelVersion,record.manifestHash,"evaluated_optimization_candidate_not_training_data",change.changeHours,change.direction,support.status,support.uncertainty.status,JSON.stringify(support.warnings)];
+      });
       return new Response([headers,...values].map(row=>row.map(csvCell).join(",")).join("\r\n"),{headers:{"Content-Type":"text/csv","Content-Disposition":`attachment; filename="aquaivolt-${id}-2000-scenarios.csv"`,"Cache-Control":"no-store"}});
     }catch{return NextResponse.json({error:"Audit storage unavailable"},{status:503});}
   }

@@ -6,6 +6,8 @@ import {feedstocks,inputFields,profiles,type ModelInput} from "../lib/inputs";
 import type {MlResult} from "../lib/ml-execution";
 import type {mlManifest} from "../lib/ml-manifest";
 import {api,EvidenceLinks,format,message,Raw,Status,Verification,type VerificationReport} from "./audit-ui";
+import DomainNotice from "./DomainNotice";
+import {assessDomain} from "../lib/domain";
 
 type Setup={manifest:typeof mlManifest;manifestHash:string;status:string;runtime:{engine:string;version:string;provider:string}};
 const modelIds=["gradient_boosting","ridge"] as const;
@@ -18,7 +20,7 @@ const outputs=[
   {label:"Daily electricity",unit:"kWh/day",group:"derived",key:"electricityKwhDay"},
 ] as const;
 
-export default function MLPredictions({selected}:{selected:MlResult|null}){
+export default function MLPredictions({selected,onRecorded}:{selected:MlResult|null;onRecorded?:(id:string)=>void}){
   const [setup,setSetup]=useState<Setup|null>(null),[setupError,setSetupError]=useState("");
   const [inputs,setInputs]=useState<ModelInput>(selected?.effectiveInputs??{...profiles[0].inputs});
   const [profileId,setProfileId]=useState(selected?"CUSTOM":profiles[0].id);
@@ -34,6 +36,7 @@ export default function MLPredictions({selected}:{selected:MlResult|null}){
       setHttp(response.status);const data=await response.json();
       if(!response.ok)throw new Error(data.issues?data.issues.map((i:{field:string;message:string})=>`${i.field}: ${i.message}`).join("; "):data.error);
       setRun(data);
+      if(data.audit.saved)onRecorded?.(data.runId);
     }catch(e){setError(message(e));}finally{setBusy("");}
   }
   async function verify(){
@@ -59,10 +62,12 @@ export default function MLPredictions({selected}:{selected:MlResult|null}){
       <div className="at-inputs"><label>Feedstock<select value={inputs.feedstock} disabled={Boolean(busy)} onChange={e=>edit({...inputs,feedstock:e.target.value})}>{feedstocks.map(f=><option key={f}>{f}</option>)}</select></label>{inputFields.map(f=><label key={f.key}>{f.label}<span className="at-number"><input required type="number" step="any" min={f.min} max={f.max} value={Number.isFinite(inputs[f.key])?inputs[f.key]:""} disabled={Boolean(busy)} onChange={e=>edit({...inputs,[f.key]:e.target.value===""?NaN:Number(e.target.value)})}/><small>{f.unit}</small></span></label>)}</div>
       <div className="at-actions"><button className="primary" disabled={Boolean(busy)||!setup}><Play size={16}/>{busy==="prediction"?"Running both models...":"Run ML prediction"}</button><button type="button" disabled={Boolean(busy)} onClick={()=>void invalidTest()}><FlaskConical size={16}/>Test null rejection</button>{http!==null&&<code>HTTP {http}</code>}</div>
     </form>
+    {inputFields.every(f=>Number.isFinite(inputs[f.key]))&&<DomainNotice assessment={assessDomain(inputs)} title="Submitted input support"/>}
     <Raw title="ML request payload" value={{operatingConditions:inputs}}/>
     {negative&&<div className="at-negative"><div className="at-heading"><h3>Null pH rejection</h3><Status value={negative.status}/><code>HTTP {negative.http}</code></div><Raw title="Invalid request and actual ML response" value={negative}/></div>}
     {run&&<>
       <div className="at-heading"><h3>ML prediction results</h3><Status value={run.audit.status}/></div>
+      <DomainNotice assessment={run.domainAssessment} title="Executed input support"/>
       {!run.audit.saved&&<div className="at-error">Predictions returned, but persistent audit evidence was not confirmed. No passing audit report has been issued.</div>}
       <dl className="at-details"><div><dt>Run ID</dt><dd><code>{run.runId}</code></dd></div><div><dt>Executed at</dt><dd>{new Date(run.createdAt).toLocaleString()}</dd></div><div><dt>Mode</dt><dd>{run.mode}</dd></div><div><dt>Manifest SHA-256</dt><dd><code>{run.manifestHash}</code></dd></div></dl>
       <div className="at-table-wrap"><table><caption>Returned model predictions</caption><thead><tr><th>Output</th>{run.predictions.map(p=><th key={p.modelId}>{p.modelName}</th>)}<th>Unit</th></tr></thead><tbody>{outputs.map(o=><tr key={o.key}><th>{o.label}{o.group==="derived"&&<small className="at-subtext">Derived from raw prediction</small>}</th>{run.predictions.map(p=><td key={p.modelId}>{format((p[o.group] as Record<string,number>)[o.key])}</td>)}<td>{o.unit}</td></tr>)}<tr><th>Trained features</th>{run.predictions.map(p=><td key={p.modelId}>{p.featureCount}</td>)}<td>inputs</td></tr><tr><th>Target basis</th>{run.predictions.map(p=><td key={p.modelId}>{p.targetBasis}</td>)}<td /></tr><tr><th>Physical bounds</th>{run.predictions.map(p=><td key={p.modelId}><Status value={p.physicallyPlausible?"WITHIN BOUNDS":"OUTSIDE BOUNDS"}/></td>)}<td>Not accuracy validation</td></tr></tbody></table></div>

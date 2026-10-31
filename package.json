@@ -12,6 +12,8 @@
     "start": "next start",
     "build:sites": "vinext build",
     "test": "pnpm run build && node --test tests/*.test.mjs",
+    "test:ui": "node scripts/verify-audit-ui.mjs",
+    "graphify": "node scripts/graphify.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
@@ -35,6 +37,7 @@
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "playwright": "1.62.1",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",

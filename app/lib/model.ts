@@ -1,5 +1,8 @@
 import { getThresholds } from "./audit";
 import { modelCard, modelMetadata } from "./system";
+import {referenceScenarios} from "./reference-data";
+import {assessDomain} from "./domain";
+import {hrtChange} from "./hrt";
 
 type Scenario = {
   feedstock: string; temperature: number; ph: number; olr: number; hrt: number; codIn: number;
@@ -14,18 +17,7 @@ type Setpoints = Omit<ModelInput,"feedstock">;
 
 // The physical inference stays deterministic. Each request seeds a bounded candidate
 // search, so repeated runs can explore different high-quality operating setpoints.
-const scenarios: Scenario[] = [
-  {feedstock:"Dairy WW",temperature:35,ph:7.1,olr:3.5,hrt:22,codIn:7000,methaneBefore:58,methaneAfter:65,gasBefore:120,gasAfter:138,generatorBefore:42,generatorAfter:49},
-  {feedstock:"Cow Manure",temperature:37,ph:7.2,olr:2.8,hrt:25,codIn:6500,methaneBefore:60,methaneAfter:68,gasBefore:140,gasAfter:162,generatorBefore:50,generatorAfter:58},
-  {feedstock:"Food Waste",temperature:36,ph:7.3,olr:4,hrt:18,codIn:9000,methaneBefore:55,methaneAfter:66,gasBefore:150,gasAfter:181,generatorBefore:53,generatorAfter:64},
-  {feedstock:"Paper Mill",temperature:38,ph:7,olr:3,hrt:20,codIn:8500,methaneBefore:57,methaneAfter:64,gasBefore:130,gasAfter:149,generatorBefore:46,generatorAfter:53},
-  {feedstock:"Brewery",temperature:37,ph:7.4,olr:2.5,hrt:24,codIn:6000,methaneBefore:61,methaneAfter:69,gasBefore:118,gasAfter:136,generatorBefore:41,generatorAfter:48},
-  {feedstock:"Mixed Waste",temperature:36.5,ph:7.15,olr:3.2,hrt:21,codIn:7800,methaneBefore:56,methaneAfter:65,gasBefore:125,gasAfter:145,generatorBefore:44,generatorAfter:51},
-  {feedstock:"Dairy WW",temperature:37,ph:7.25,olr:3.1,hrt:23,codIn:7200,methaneBefore:59,methaneAfter:67,gasBefore:132,gasAfter:154,generatorBefore:47,generatorAfter:55},
-  {feedstock:"Food Waste",temperature:36.8,ph:7.2,olr:3.7,hrt:19,codIn:9800,methaneBefore:54,methaneAfter:64,gasBefore:170,gasAfter:196,generatorBefore:61,generatorAfter:70},
-  {feedstock:"Cow Manure",temperature:37.2,ph:7.18,olr:2.9,hrt:26,codIn:6200,methaneBefore:62,methaneAfter:70,gasBefore:145,gasAfter:166,generatorBefore:52,generatorAfter:60},
-  {feedstock:"Paper Mill",temperature:36.9,ph:7.22,olr:3.3,hrt:22,codIn:8000,methaneBefore:58,methaneAfter:66,gasBefore:135,gasAfter:156,generatorBefore:48,generatorAfter:56},
-];
+const scenarios: Scenario[] = referenceScenarios;
 
 const coreBounds = {
   feedRate:[820,870], temperature:[34.08,38.87], ph:[6.82,7.58], olr:[1.55,6.38],
@@ -219,7 +211,8 @@ export async function runModel(x:ModelInput & {previousRun?:{prediction?:{biogas
   const createdAt = new Date().toISOString();
   const optimization=searchOptimizationCandidates(safe,options.seed??runId);
   mark("Search setpoints",`${optimization.candidateCount} candidate input sets evaluated; rank ${optimization.selectedRank} selected`);
-  const retentionTime={beforeHours:round(safe.hrt*24),optimizedHours:optimization.operationalHrtHours,reductionHours:round(safe.hrt*24-optimization.operationalHrtHours,2)};
+  // reductionHours is retained for older API clients; positive changeHours means an increase.
+  const retentionTime={beforeHours:round(safe.hrt*24),optimizedHours:optimization.operationalHrtHours,...hrtChange(round(safe.hrt*24),optimization.operationalHrtHours),reductionHours:round(safe.hrt*24-optimization.operationalHrtHours,2)};
   const core=inferCore({...safe,...optimization.setpoints},referenceSetpoints(safe.feedstock));
   const baselineCore=inferCore(safe,referenceSetpoints(safe.feedstock));
   mark("Calculate comparison","Baseline from effective inputs; optimized outputs from selected candidate inputs");
@@ -417,7 +410,7 @@ export async function runModel(x:ModelInput & {previousRun?:{prediction?:{biogas
   const responseData = {biogas,methanePct,methane,electricity,carbon,codRemoval,stability,confidence,improvement,pressure,h2s,
     generatorKw,optimizationTargets,overallBenefit,benefitTrend,recommendations:recommendations.slice(0,5),recommendedProjection,forecast,hourlyForecast,modelCurves,
     bestSetpoints,retentionTime,scenarioPreview:optimization.scenarioPreview,agentMessage,modelName:modelMetadata.name,modelVersion:modelMetadata.version,modelFit:modelMetadata.fit,outOfRange,extrapolatedInputs,
-    confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,performanceMetrics,alerts,equipmentStates,inputEffects,modelTrace,
+    domainAssessment:assessDomain(safe),optimizedDomainAssessment:assessDomain({...safe,...bestSetpoints}),confidenceMeaning:"Scenario coverage, not calibrated uncertainty",baseline,optimized,gasComposition,performanceMetrics,alerts,equipmentStates,inputEffects,modelTrace,
     effectiveInputs:safe,optimizedInputs:{...safe,...bestSetpoints},sourceProfile:`${feedstock} operating conditions`,
     facility:{name:thresholds.facilityName,location:thresholds.facilityLocation},mode:"SIMULATION",runId,createdAt};
   return responseData;

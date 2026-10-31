@@ -1,12 +1,13 @@
 import { get, list, put } from "@vercel/blob";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fingerprint, signEvidence, verifySignature } from "./evidence";
+import {auditPage,type AuditEntry} from "./audit-pagination";
 
 export type ThresholdSettings = {methaneMinimum:number;h2sWarning:number;oxygenMaximum:number;pressureMinimum:number;pressureMaximum:number;facilityName:string;facilityLocation:string};
 export const defaultThresholds:ThresholdSettings={methaneMinimum:55,h2sWarning:500,oxygenMaximum:2,pressureMinimum:12,pressureMaximum:30,facilityName:"Aquaivolt Demonstration Plant",facilityLocation:"Lebanon"};
 export type EvidenceRecord = {
-  id:string;createdAt:string;username:string;role:string;kind:"optimization"|"verification"|"ml_prediction"|"ml_verification";
+  id:string;createdAt:string;username:string;role:string;kind:"optimization"|"verification"|"ml_prediction"|"ml_verification"|"plant_observation"|"plant_evaluation";
   request:unknown;inputs:unknown;response:unknown;modelVersion:string;manifestHash:string;
   requestHash:string;inputsHash:string;responseHash:string;outputHash:string;
 };
@@ -49,6 +50,7 @@ export async function storeEvidence(record:EvidenceRecord) {
   return signed;
 }
 export function verifyEvidence(record:SignedRecord) {
+  if(!record||typeof record.signature!=="string"||typeof record.recordHash!=="string")return false;
   const {signature,recordHash,...content}=record;
   return fingerprint(content)===recordHash && verifySignature(content,signature)
     && fingerprint(content.request)===content.requestHash && fingerprint(content.inputs)===content.inputsHash
@@ -60,16 +62,38 @@ export async function getEvidence(id:string):Promise<SignedRecord|null> {
 }
 export async function listEvidence(limit=20,cursor?:string) {
   const count=Math.max(1,Math.min(50,limit));
+  // Validate cursors before accessing storage. Never paginate UUID names and then sort just that page.
+  auditPage([],count,cursor);
+  const entries:AuditEntry[]=[];
   if(process.env.BLOB_READ_WRITE_TOKEN){
-    const page=await list({prefix:"audit-v2/records/",limit:count,cursor,abortSignal:AbortSignal.timeout(12000)});
-    const records=await Promise.all(page.blobs.map(async b=>readObject(b.pathname) as Promise<SignedRecord>));
-    return {records:records.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)),cursor:page.hasMore?page.cursor:undefined,hasMore:page.hasMore};
+    let storageCursor:string|undefined;
+    do{
+      const page=await list({prefix:"audit-v2/records/",limit:1000,cursor:storageCursor,abortSignal:AbortSignal.timeout(12000)});
+      for(const blob of page.blobs){
+        const id=blob.pathname.slice("audit-v2/records/".length).replace(/\.json$/,"");
+        if(validRunId(id)&&blob.pathname===keyFor(id))entries.push({id,key:blob.pathname,storedAt:new Date(blob.uploadedAt).toISOString()});
+      }
+      if(page.hasMore&&(!page.cursor||page.cursor===storageCursor))throw new AuditUnavailable();
+      storageCursor=page.hasMore?page.cursor:undefined;
+    }while(storageCursor);
+  }else{
+    const directory=localDirectory();if(!directory)throw new AuditUnavailable();
+    const root=path.join(directory,"audit-v2/records");await mkdir(root,{recursive:true});
+    const names=(await readdir(root)).filter(n=>n.endsWith(".json")&&validRunId(n.slice(0,-5)));
+    for(const name of names){
+      const info=await stat(path.join(root,name));
+      entries.push({id:name.slice(0,-5),key:`audit-v2/records/${name}`,storedAt:info.birthtime.toISOString()});
+    }
   }
-  const directory=localDirectory();if(!directory)throw new AuditUnavailable();
-  const root=path.join(directory,"audit-v2/records");await mkdir(root,{recursive:true});
-  const names=(await readdir(root)).filter(n=>n.endsWith(".json")).sort();const offset=Number(cursor)||0;
-  const records=await Promise.all(names.slice(offset,offset+count).map(async n=>JSON.parse(await readFile(path.join(root,n),"utf8")) as SignedRecord));
-  return {records:records.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)),cursor:String(offset+count),hasMore:offset+count<names.length};
+  const page=auditPage(entries,count,cursor);
+  const items=await Promise.all(page.items.map(async entry=>{
+    try{
+      const record=await readObject(entry.key) as SignedRecord|null;
+      if(!record||record.id!==entry.id)throw new Error();
+      return {...entry,record,readError:false};
+    }catch{return {...entry,record:null,readError:true};}
+  }));
+  return {...page,items};
 }
 export async function auditStoreReady(){
   try{

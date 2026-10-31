@@ -35,14 +35,14 @@ export async function executeRequest(body:unknown,session:AquaSession,onProgress
     seed:result.modelTrace.optimization.seed,requestHash:fingerprint(body),inputsHash:fingerprint(result.effectiveInputs),outputHash:outputFingerprint(result),
     deployment:process.env.VERCEL_DEPLOYMENT_ID??process.env.VERCEL_URL??"local-development"};
   report("evidence","complete",`Run ${result.runId}; model ${result.modelVersion}; request and output SHA-256 fingerprints calculated`);
-  report("storage","running","Writing signed audit evidence and confirming an independent readback");
+  report("storage","running","Writing server-authenticated audit evidence and confirming a storage readback");
   const finish=<T,>(value:T)=>{report("results","running","Preparing the final response");report("results","complete","Production estimates, selected settings and recommendations ready");return value;};
   try{
     const record=await storeEvidence({id:result.runId,createdAt:result.createdAt,username:session.username,role:session.role,kind:"optimization",
       request:body,inputs:result.effectiveInputs,response,modelVersion:result.modelVersion,manifestHash,
       requestHash:response.requestHash,inputsHash:response.inputsHash,responseHash:fingerprint(response),outputHash:response.outputHash});
     console.info(JSON.stringify({event:"optimization.completed",runId:result.runId,modelVersion:result.modelVersion,manifestHash,inputHash:record.inputsHash,outputHash:record.outputHash,audit:"RECORDED"}));
-    report("storage","complete",`RECORDED / ${storageProvider()} / signature verified after readback`);
+    report("storage","complete",`RECORDED / ${storageProvider()} / server HMAC verified after readback`);
     return finish({...response,audit:{runId:result.runId,createdAt:result.createdAt,saved:true,status:"RECORDED",provider:storageProvider(),recordHash:record.recordHash,retrievalUrl:`/api/audit?runId=${result.runId}`}});
   }catch{
     console.error(JSON.stringify({event:"audit.write.failed",runId:result.runId,modelVersion:result.modelVersion}));

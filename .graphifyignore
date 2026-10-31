@@ -1,0 +1,40 @@
+# Local configuration and deployment metadata
+.env*
+.npmrc
+.vercel/
+.agents/
+.codex/
+
+# Dependencies, generated output and execution records
+node_modules/
+.next/
+.vinext/
+.wrangler/
+dist/
+out/
+outputs/
+work/
+coverage/
+graphify-out/
+audit-evidence/
+test-results/
+.audit-test-data/
+ai-workflow/.venv/
+ai-workflow/run-evidence/
+ai-workflow/test-evidence/
+__pycache__/
+*.pyc
+next-env.d.ts
+app/lib/model-build.json
+app/lib/trained-build.json
+
+# Model binaries, datasets and media are not code dependencies
+ai-workflow/models/
+public/
+*.joblib
+*.onnx
+*.pkl
+*.xlsx
+*.csv
+*.pdf
+*.docx

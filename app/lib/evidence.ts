@@ -1,5 +1,11 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
+export const evidenceAuthentication={
+  type:"SERVER_AUTHENTICATED",algorithm:"HMAC-SHA-256",digest:"SHA-256",
+  independentlyVerifiable:false,
+  explanation:"The server verifies this record using a private shared secret. This is not a public-key digital signature or independent verification of the measurements.",
+} as const;
+
 export function canonical(value: unknown): string {
   if (value === undefined) return "null";
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;

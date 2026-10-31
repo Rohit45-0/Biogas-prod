@@ -10,6 +10,8 @@ This repository contains the Aquaivolt biogas dashboard, its server-side predict
 
 **Current audit instructions and architecture:** [Audit Trail 1.8.0](docs/AUDIT_TRAIL.md). Earlier diagrams and presentations describe historical versions and should not be treated as a current deployment manifest.
 
+For a searchable map of the current application and Python workflow, see [Graphify setup and queries](docs/GRAPHIFY.md). Run `pnpm graphify` to rebuild it. The [audit remediation checklist](docs/AUDIT_REMEDIATION_2026-10-31.md) describes the latest corrections and the remaining plant-validation prerequisites.
+
 ## What happens when the user calculates production?
 
 ```text
@@ -47,7 +49,7 @@ The dashboard considers:
 | Trained ML prediction API | [`app/api/ml/predict/route.ts`](app/api/ml/predict/route.ts) | Audit Trail: actual Ridge and Gradient Boosting predictions |
 | Trained ML runtime | [`app/lib/ml-runtime.ts`](app/lib/ml-runtime.ts) | Hash-checked ONNX CPU inference using the saved fitted pipelines |
 | Audit Trail | [`app/components/AuditTrail.tsx`](app/components/AuditTrail.tsx) | Execution, reproducibility, comparison and record retrieval |
-| Private audit storage | [`app/lib/audit.ts`](app/lib/audit.ts) | Signed records in private Vercel Blob with readback verification |
+| Private audit storage | [`app/lib/audit.ts`](app/lib/audit.ts) | Server-authenticated records in private Vercel Blob with readback verification |
 | LangGraph workflow | [`ai-workflow/src/aquaivolt_langgraph_backend.py`](ai-workflow/src/aquaivolt_langgraph_backend.py) | Executable nine-node technical workflow |
 | Saved ML artifacts | [`ai-workflow/models`](ai-workflow/models) | Gradient Boosting and Ridge pipelines |
 | Model comparison | [`ai-workflow/evaluation`](ai-workflow/evaluation) | Evaluation results and limitations |
@@ -143,7 +145,7 @@ These archived evaluation scores have not been rerun against model version 1.8.0
 
 ## Trained ML in Audit Trail
 
-Admin -> Audit Trail -> ML predictions. Submit explicit operating conditions to execute both trained models, export their actual predictions and signed evidence, and replay a stored run with **Verify ML run**. No OpenAI API call is required for these predictions.
+Admin -> Audit Trail -> ML predictions. Submit explicit operating conditions to execute both trained models, export their actual predictions and server-authenticated evidence, and replay a stored run with **Verify ML run**. No OpenAI API call is required for these predictions.
 
 - Gradient Boosting: `best_10_anchor_model.joblib`, six input features, fitted on 10 reference rows. Its targets are the reference dataset's after-AI outputs.
 - Ridge: `best_scada_tabular_model.joblib`, eight input features, fitted on the 800-row training split of the SCADA template.
