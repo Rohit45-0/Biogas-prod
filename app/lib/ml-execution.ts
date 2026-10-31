@@ -4,6 +4,7 @@ import {fingerprint} from "./evidence";
 import {resolveMlRequest,mlModelIds} from "./ml-contract";
 import {mlManifest,mlManifestHash} from "./ml-manifest";
 import {loadMlModels,predictTrainedModel} from "./ml-runtime";
+import {assessDomain} from "./domain";
 
 export async function calculateMl(body:unknown){
   const started=performance.now();
@@ -20,7 +21,7 @@ export async function calculateMl(body:unknown){
     mark(`Execute ${prediction.modelName}`,`${prediction.featureCount} trained features passed through the fitted encoder, scaler and regressor; three model outputs returned`);
   }
   mark("Derive daily outputs","Biogas = gas flow x 24; methane = biogas x CH4/100; electricity = generator kW x 24. No scenario-engine values substituted.");
-  return {effectiveInputs:operatingConditions,predictions,runtime,trace,outputHash:fingerprint(predictions)};
+  return {effectiveInputs:operatingConditions,domainAssessment:assessDomain(operatingConditions),predictions,runtime,trace,outputHash:fingerprint(predictions)};
 }
 export async function executeMl(body:unknown,session:AquaSession){
   const runId=crypto.randomUUID(),createdAt=new Date().toISOString();

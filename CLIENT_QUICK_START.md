@@ -1,6 +1,6 @@
 # AQUAIVOLT: local installation and user guide
 
-Updated 12 October 2026. These steps cover the current dashboard, Overview scenario engine, trained Gradient Boosting and Ridge models, and Admin Audit Trail.
+Updated 31 October 2026. These steps cover the current dashboard, Overview scenario engine, trained Gradient Boosting and Ridge models, and Admin Audit Trail.
 
 ## 1. Download the current code
 
@@ -136,7 +136,7 @@ These checks establish software execution, reproducibility and record integrity.
 
 - Audit records are written under `test-results/local-store/audit-v2/records` relative to the application folder. Keep this directory when updating the source.
 - Local records are separate from production records. A production run ID will not appear locally unless its storage is deliberately integrated. Do not connect production storage just to follow this guide.
-- The visible records list may not be a complete chronological index. Retain the run IDs shown after each calculation and use direct ID retrieval when needed.
+- The records list is ordered globally by storage time, newest first, with a loaded/total count. Use Load more records for the next page and Refresh for newly stored records. Direct retrieval by run ID remains available. Failed reads remain visible rather than silently disappearing.
 - JSON evidence uses hashes and a server-held HMAC. It is a server-authenticated export, not a public-key signature that an external auditor can independently verify.
 - Without an OpenAI key, Copilot uses its built-in keyword explanation fallback. Overview optimization and trained ML predictions do not require that service.
 - Analyzer/IoT readings and equipment control are not connected by this setup. The application remains an advisory prototype using supplied reference data or explicitly submitted values.
@@ -203,6 +203,16 @@ py -3.12 -m venv .venv
 ```
 
 The workflow writes `ai-workflow/run-evidence/latest_run.json`. It is a separate technical demonstration; it does not replace the Overview endpoint or start the web dashboard.
+
+## 12. Plant validation preparation
+
+Admin > Audit Trail > Plant validation records measured outputs against a saved ML run. Do not enter invented or reference measurements as plant evidence. Actual collection starts only after equipment commissioning and calibration.
+
+Record the plant, holdout dataset, sample identifier, measurement timestamp, source/calibration reference, gas flow (m3/h), methane content (%) and generator power (kW). Confirm that the data were excluded from training/tuning and align with the saved run's operating conditions. Then select Record measurement.
+
+Use the resulting observation IDs to calculate a measured-error report. Reports require one plant, dataset and model build, reject repeated samples/runs and retain the exact record hashes. MAE, RMSE, bias and R2 are descriptive results, not automatic validation approval. For one sample or constant measured outputs, R2 is marked undefined. JSON/CSV evidence is available through the normal audit export controls.
+
+Feedstock reference envelopes and unavailable uncertainty are displayed with predictions. They are not certified safe operating ranges. See [the remediation checklist](docs/AUDIT_REMEDIATION_2026-10-31.md) for the five auditor findings and remaining external evidence.
 
 ## Official installation references
 

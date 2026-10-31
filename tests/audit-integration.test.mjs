@@ -33,8 +33,9 @@ test("audit APIs exercise real model execution and durable records",{timeout:120
   await start();
   let run,mlRun;
   await t.test("authentication and Admin boundaries",async()=>{
-    for(const route of ["/api/predict","/api/model","/api/audit","/api/audit/tests","/api/ml/predict"]){assert.equal((await call(route,undefined,"")).status,401);}
-    for(const route of ["/api/audit","/api/audit/tests","/api/ml/predict"]){assert.equal((await call(route,undefined,userCookie)).status,403);}
+    for(const route of ["/api/predict","/api/model","/api/audit","/api/audit/tests","/api/ml/predict","/api/validation"]){assert.equal((await call(route,undefined,"")).status,401);}
+    for(const route of ["/api/audit","/api/audit/tests","/api/ml/predict","/api/validation"]){assert.equal((await call(route,undefined,userCookie)).status,403);}
+    assert.equal((await call("/api/validation",{},userCookie)).status,403);
     for(const route of ["/api/ml/predict","/api/ml/verify"]){assert.equal((await call(route,{},"")).status,401);assert.equal((await call(route,{},userCookie)).status,403);}
     assert.equal((await call("/api/reports/batch",{requests:[request,request]},userCookie)).status,403);
     assert.equal((await call("/api/predict",request,userCookie)).status,403);
@@ -124,6 +125,66 @@ test("audit APIs exercise real model execution and durable records",{timeout:120
     await writeFile(file,JSON.stringify(tampered));
     try{assert.equal((await call("/api/ml/verify",{runId:mlRun.runId})).status,409);assert.equal((await call(`/api/ml/predict?runId=${mlRun.runId}&format=csv`)).status,409);}finally{await writeFile(file,original);}
   });
+  await t.test("pH 11 carries feedstock-specific warnings and explicit unavailable uncertainty",async()=>{
+    const body={operatingConditions:{...dairy,ph:11}};
+    for(const route of ["/api/ml/predict","/api/predict"]){
+      const r=await call(route,body);assert.equal(r.status,200);
+      const domain=r.data.domainAssessment;assert.equal(domain.status,"OUTSIDE_REFERENCE_ENVELOPE");assert.equal(domain.feedstock,"Dairy WW");
+      const ph=domain.fields.find(f=>f.key==="ph");assert.equal(ph.status,"OUTSIDE");assert.equal(ph.min,7.1);assert.equal(ph.max,7.25);
+      assert.equal(domain.validatedOperatingRanges,null);assert.equal(domain.uncertainty.status,"NOT_CALIBRATED");assert.equal(domain.uncertainty.predictionInterval,null);
+      const stored=await call(`/api/audit?runId=${r.data.runId}`);assert.equal(stored.data.integrity,true);assert.deepEqual(stored.data.record.response.domainAssessment,domain);
+    }
+    const csv=await fetch(base+`/api/ml/predict?runId=${mlRun.runId}&format=csv`,{headers:{Cookie:cookie}});assert.match(await csv.text(),/reference_envelope_status.*uncertainty_status.*warnings_json/);
+  });
+  await t.test("exports disclose server authentication without changing record integrity",async()=>{
+    const json=await call(`/api/audit?runId=${mlRun.runId}&format=json`);assert.equal(json.data.integrity,true);assert.equal(json.data.authentication.type,"SERVER_AUTHENTICATED");assert.equal(json.data.authentication.independentlyVerifiable,false);
+    const csv=await fetch(base+`/api/audit?runId=${mlRun.runId}&format=csv`,{headers:{Cookie:cookie}});assert.match(await csv.text(),/SERVER_AUTHENTICATED/);
+  });
+  await t.test("record listing spans more than two pages and shows newly created records first",async()=>{
+    const added=[];
+    for(let i=0;i<43;i++){const result=await call("/api/ml/predict",{operatingConditions:dairy});assert.equal(result.status,200);assert.equal(result.data.audit.saved,true);added.push(result.data.runId);}
+    const first=await call("/api/audit?limit=20");assert.equal(first.status,200);assert.ok(first.data.total>40);assert.ok(first.data.runs.some(r=>r.id===added.at(-1)));
+    const loaded=[...first.data.runs];let cursor=first.data.cursor;
+    while(cursor){const page=await call(`/api/audit?limit=20&cursor=${encodeURIComponent(cursor)}`);assert.equal(page.status,200);loaded.push(...page.data.runs);cursor=page.data.cursor;}
+    assert.equal(loaded.length,first.data.total);assert.equal(new Set(loaded.map(r=>r.id)).size,loaded.length);
+    for(const id of [...added,run.runId,mlRun.runId])assert.ok(loaded.some(r=>r.id===id));
+    for(let i=1;i<loaded.length;i++)assert.ok(loaded[i-1].storedAt>=loaded[i].storedAt);
+    assert.equal((await call("/api/audit?cursor=invalid")).status,400);
+    await call("/api/auth/logout",{});
+    const login=await fetch(base+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:"admin",password})});cookie=login.headers.get("set-cookie").split(";")[0];
+    const refreshed=await call("/api/audit?limit=20");assert.ok(refreshed.data.runs.some(r=>r.id===added.at(-1)));
+  });
+  await t.test("plant measurements require declarations and produce auditable errors, not validation approval",async()=>{
+    assert.equal((await call("/api/validation")).data.status,"INDEPENDENT_PLANT_VALIDATION_PENDING");
+    const body={action:"record",runId:mlRun.runId,plantId:"TEST-PLANT-NOT-REAL",datasetId:"AUTOMATED-TEST-ONLY",sampleId:"test-1",measuredAt:new Date().toISOString(),sourceReference:"Automated fixture, not real plant evidence",measured:{gasFlowM3h:100,methanePct:60,generatorKw:40},declarations:{measuredPlantData:true,equipmentCommissioned:true,excludedFromTrainingAndTuning:true,alignedToRunInputs:true}};
+    assert.equal((await call("/api/validation",{...body,declarations:{...body.declarations,excludedFromTrainingAndTuning:false}})).status,422);
+    assert.equal((await call("/api/validation",{...body,measured:{...body.measured,methanePct:null}})).status,422);
+    assert.equal((await call("/api/validation",{...body,measured:{...body.measured,gasFlowM3h:1e308}})).status,422);
+    assert.equal((await call("/api/validation",{...body,runId:run.runId})).status,422);
+    assert.equal((await call("/api/validation",{...body,measuredAt:"2099-01-01T00:00:00Z"})).status,422);
+    const a=await call("/api/validation",body);assert.equal(a.status,201);assert.equal(a.data.saved,true);assert.equal(a.data.status,"REVIEW_REQUIRED");
+    const next=(await call("/api/ml/predict",{operatingConditions:dairy})).data;
+    const b=await call("/api/validation",{...body,runId:next.runId,sampleId:"test-2",measured:{gasFlowM3h:120,methanePct:60,generatorKw:50}});assert.equal(b.status,201);
+    const report=await call("/api/validation",{action:"evaluate",observationIds:[a.data.id,b.data.id]});assert.equal(report.status,201);assert.equal(report.data.sampleCount,2);assert.equal(report.data.optimizationBenefit,"NOT ESTABLISHED");assert.equal(report.data.status,"REVIEW_REQUIRED");
+    for(const model of report.data.models){
+      const predicted=mlRun.predictions.find(p=>p.modelId===model.modelId).raw.gasFlowM3h,gas=model.metrics.find(m=>m.key==="gasFlowM3h");
+      assert.ok(Math.abs(gas.mae-(Math.abs(predicted-100)+Math.abs(predicted-120))/2)<1e-8);
+      assert.ok(Math.abs(gas.rmse-Math.sqrt(((predicted-100)**2+(predicted-120)**2)/2))<1e-8);
+      assert.ok(Math.abs(gas.r2-(1-((predicted-100)**2+(predicted-120)**2)/200))<1e-8);
+      assert.equal(model.metrics.find(m=>m.key==="methanePct").r2,null);
+    }
+    const single=await call("/api/validation",{action:"evaluate",observationIds:[a.data.id]});assert.ok(single.data.models.every(m=>m.metrics.every(f=>f.r2===null)));
+    assert.equal((await call("/api/validation",{action:"evaluate",observationIds:[a.data.id,a.data.id]})).status,422);
+    const duplicate=await call("/api/validation",{...body,sampleId:"different-label-same-run"});assert.equal((await call("/api/validation",{action:"evaluate",observationIds:[a.data.id,duplicate.data.id]})).status,422);
+    const wrongPlant=await call("/api/validation",{...body,plantId:"OTHER",runId:next.runId});assert.equal((await call("/api/validation",{action:"evaluate",observationIds:[a.data.id,wrongPlant.data.id]})).status,422);
+    const evidence=await call(`/api/audit?runId=${report.data.id}`);assert.equal(evidence.data.integrity,true);assert.equal(evidence.data.record.kind,"plant_evaluation");
+    const file=path.join(dataDir,"audit-v2/records",a.data.id+".json"),original=await readFile(file,"utf8"),tampered=JSON.parse(original);tampered.response.measured.gasFlowM3h=999;
+    await writeFile(file,JSON.stringify(tampered));
+    try{assert.equal((await call("/api/validation",{action:"evaluate",observationIds:[a.data.id]})).status,422);}finally{await writeFile(file,original);}
+    const parentFile=path.join(dataDir,"audit-v2/records",mlRun.runId+".json"),parentOriginal=await readFile(parentFile,"utf8"),parentTampered=JSON.parse(parentOriginal);parentTampered.response.predictions[0].raw.gasFlowM3h+=1;
+    await writeFile(parentFile,JSON.stringify(parentTampered));
+    try{assert.equal((await call("/api/validation",{action:"evaluate",observationIds:[a.data.id]})).status,422);}finally{await writeFile(parentFile,parentOriginal);}
+  });
   await t.test("tampered evidence fails integrity and cannot pass verification",async()=>{
     const file=path.join(dataDir,"audit-v2/records",run.runId+".json"),original=await readFile(file,"utf8"),tampered=JSON.parse(original);tampered.response.baseline.biogas+=10;
     await writeFile(file,JSON.stringify(tampered));
@@ -136,6 +197,7 @@ test("audit APIs exercise real model execution and durable records",{timeout:120
   await t.test("missing persistent storage never reports RECORDED or a passing audit",async()=>{
     await stop();await start(false);const failed=await call("/api/predict",request);assert.equal(failed.status,200);assert.equal(failed.data.audit.saved,false);assert.equal(failed.data.audit.status,"NOT RECORDED");assert.equal((await call("/api/audit")).status,503);assert.equal((await call("/api/audit/tests",{runId:run.runId})).status,503);
     const mlFailed=await call("/api/ml/predict",{operatingConditions:dairy});assert.equal(mlFailed.status,200);assert.equal(mlFailed.data.audit.status,"NOT RECORDED");assert.equal(mlFailed.data.audit.saved,false);assert.equal((await call("/api/ml/verify",{runId:mlRun.runId})).status,503);
+    assert.equal((await call("/api/validation",{action:"evaluate",observationIds:[mlRun.runId]})).status,503);
     const stream=await fetch(base+"/api/predict",{method:"POST",headers:{Cookie:cookie,"Content-Type":"application/json",Accept:"application/x-ndjson"},body:JSON.stringify(request)});
     const events=(await stream.text()).trim().split("\n").map(line=>JSON.parse(line));assert.equal(events.at(-1).data.audit.saved,false);assert.equal(events.find(e=>e.type==="progress"&&e.step==="storage"&&e.status!=="running").status,"warning");assert.equal(events.filter(e=>e.status==="complete").length,7);
   });

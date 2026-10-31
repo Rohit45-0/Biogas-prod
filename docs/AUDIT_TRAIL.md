@@ -1,5 +1,7 @@
 # AQUAIVOLT Audit Trail
 
+Source update: 31 October 2026. See [audit remediation and retest checklist](AUDIT_REMEDIATION_2026-10-31.md). Confirm the deployed source/manifest hash before treating these source changes as live production behavior.
+
 ## Access and test sequence
 
 Sign in to the current production dashboard at https://aquaivolt-command-center.vercel.app using the Admin account. Select **Audit Trail** in the sidebar. The normal User account retains the one-button overview and can export its own candidate runs, but cannot access other users' evidence or run Admin tests.
@@ -9,8 +11,8 @@ Sign in to the current production dashboard at https://aquaivolt-command-center.
 1. Select an operating profile or enter explicit values. **Run ML prediction** calls `/api/ml/predict` and executes both trained pipelines: Gradient Boosting and Ridge Regression. There is no scenario fallback or simulation seed.
 2. Inspect the actual HTTP status, run ID, raw gas flow, methane content and generator power, daily derived outputs, trained input values, context-only values, artifact hashes and timed execution trace.
 3. **Test null rejection** submits null pH and expects HTTP 422 with a field-specific error. Missing operating conditions also return 422; this endpoint never silently substitutes a reference profile.
-4. **Verify ML run** reads the signed stored record and runs both fitted pipelines again. Eleven checks cover record integrity, inputs, model build, artifact identity, trained feature mapping, prediction repeatability and daily unit conversions. The verification report is itself persisted and read back.
-5. Download signed JSON, evidence CSV or Prediction CSV (one row per trained model). Audit records can retrieve an older ML run and reopen it for replay. Replay across a changed model manifest is rejected, while original saved evidence remains retrievable.
+4. **Verify ML run** reads the server-authenticated stored record and runs both fitted pipelines again. Eleven checks cover record integrity, inputs, model build, artifact identity, trained feature mapping, prediction repeatability and daily unit conversions. The verification report is itself persisted and read back.
+5. Download server-authenticated JSON, evidence CSV or Prediction CSV (one row per trained model). Audit records can retrieve an older ML run and reopen it for replay. Replay across a changed model manifest is rejected, while original saved evidence remains retrievable.
 
 These two models use different training data and target definitions. Their outputs are not a baseline/after pair, and no winner is chosen by larger predicted output. Gradient Boosting uses six features and ten fitted reference rows. Ridge uses eight features and 800 fitted rows. Feed rate is context only for both; VFA and mixer speed are features only for Ridge. The UI and records expose this contract explicitly.
 
@@ -20,14 +22,14 @@ These two models use different training data and target definitions. Their outpu
 2. **Null rejection:** sends an actual request with a null pH. Expected result is HTTP 422 with a field-specific error, not invented output or silently defaulted pH.
 3. **Model verification:** run test 2 against the recorded run. The server independently reads the record, checks its SHA-256 hashes and HMAC, verifies the active build, reruns the same engine with the recorded seed, and compares output fingerprints. The verification report is also stored and read back before it is returned as saved.
 4. **Comparison:** runs two reference profiles through `/api/reports/batch`, which calls the same execution service as `/api/predict`. Both cases use the same seed and objective weights and receive individual persistent run IDs.
-5. **Audit records:** retrieve a run or verification report by ID, inspect its integrity result, or select a stored run for verification. Reloading the page does not remove stored records. Record pages are individually sorted by timestamp; pagination is not a globally chronological index.
-6. Download signed JSON, evidence CSV, and the 2,000 evaluated candidate rows. Use Print evidence for the current visible audit section. The candidate CSV is **not model training data**.
+5. **Audit records:** retrieve a run or verification report by ID, inspect its integrity result, or select a stored run for verification. The list enumerates all storage metadata pages before applying global newest-stored-first ordering. Timestamp/ID cursor pages retain a cutoff; Refresh starts a new view that includes newly stored records. Stored time and execution time are shown separately. Unreadable records remain visible as failed entries. Reloading or signing out does not remove stored records.
+6. Download server-authenticated JSON, evidence CSV, and the 2,000 evaluated candidate rows. Use Print evidence for the current visible audit section. The candidate CSV is **not model training data**.
 
 ## Actual execution architecture
 
-Authenticated request -> strict input validation/profile resolution -> TypeScript model -> seeded bounded candidate search -> highest-scoring candidate -> output calculation and timed trace -> signed private storage write -> independent readback -> response with RECORDED or NOT RECORDED.
+Authenticated request -> strict input validation/profile resolution -> TypeScript model -> seeded bounded candidate search -> highest-scoring candidate -> output calculation and timed trace -> server-authenticated private storage write -> independent readback -> response with RECORDED or NOT RECORDED.
 
-The trained ML route instead runs: Admin authentication -> strict explicit input validation -> hash-checked ONNX artifacts -> original fitted preprocessing and learned Gradient Boosting/Ridge inference -> raw predictions -> daily unit derivation -> signed private storage -> independent readback. It does not invoke the scenario engine or an LLM.
+The trained ML route instead runs: Admin authentication -> strict explicit input validation -> hash-checked ONNX artifacts -> original fitted preprocessing and learned Gradient Boosting/Ridge inference -> raw predictions -> daily unit derivation -> server-authenticated private storage -> independent readback. It does not invoke the scenario engine or an LLM.
 
 Production uses private Vercel Blob storage linked to the existing Vercel project. Records are never stored only in a serverless process variable or temporary filesystem. Local integration tests use an explicitly configured `AQUA_AUDIT_DIR`; this fallback is disabled on Vercel. Existing older, unrecorded runs cannot be recreated as historical evidence.
 
@@ -83,14 +85,21 @@ Admin evidence endpoints:
 - `POST /api/ml/predict` with `{"operatingConditions":{...all nine explicit fields...}}`: predictions from both trained artifacts. Uses the same units as the example above, without profileId or seed. Invalid/null/missing fields return 422, not a prediction with default values.
 - `POST /api/ml/verify` with `{"runId":"<uuid>"}`: independently retrieve and replay a saved ML prediction.
 - `GET /api/ml/predict?runId=<uuid>&format=csv`: export both actual saved model predictions, units, target basis and hashes.
-- `GET /api/audit?runId=<uuid>`: signed record and integrity result; 404 if absent.
+- `GET /api/audit?runId=<uuid>`: server-authenticated record and integrity result; 404 if absent.
 - `GET /api/audit?limit=20&cursor=<cursor>`: record pages.
+- `GET /api/validation`: measured-plant evaluation prerequisites and pending status.
+- `POST /api/validation` with action `record`: link operator-reported measurements, source, sample ID, timestamp and holdout declarations to an integrity-verified saved ML run.
+- `POST /api/validation` with action `evaluate` and `observationIds`: persist MAE, RMSE, bias and R2 for one plant, dataset and frozen model build. Single-observation or constant-target R2 is undefined, not zero or a passing score.
 - `POST /api/audit/tests` with `{"runId":"<uuid>"}`: verification and stored report.
 - `POST /api/reports/batch` with `{"requests":[<request>,<request>]}`: 2-5 comparisons.
 - `GET /api/audit?runId=<uuid>&format=json` or `format=csv`: evidence downloads.
 - `GET /api/predict?runId=<uuid>&format=csv`: 2,000 evaluated candidates. Requires the original stored run and matching current model manifest; cross-build exports fail explicitly instead of reconstructing different values.
 
 ## Limits and remaining external evidence
+
+Predictions now include `domainAssessment`: per-feedstock bounds derived only from the ten supplied optimization references, unknown fields, explicit outside-envelope warnings, an uncalibrated uncertainty status and null prediction intervals. These are reference envelopes, not validated safe operating limits or a recovered Ridge training distribution. pH 11 remains an exploratory request within the broad API guardrails, but its out-of-reference warning is explicit in the UI, response, stored evidence and CSV. Inputs beyond the API guardrails are rejected with HTTP 422.
+
+Plant validation records require explicit commissioning, real-measurement, input-alignment and exclusion-from-training/tuning declarations. The application cannot independently verify these declarations or dataset completeness. It never promotes a saved measurement or error report to independent validation or an optimization-benefit claim. Real measured before-and-after periods remain required for benefit assessment.
 
 PASS applies to the listed software checks only. It does not establish independent plant prediction accuracy, calibrated statistical uncertainty, realized optimization gains, scientific validity of the reference formulas, or grant approval. Those require measured plant data, traceable provenance, an agreed evaluation protocol and independent review. No live sensors or equipment control are connected.
 

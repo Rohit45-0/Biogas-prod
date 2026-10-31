@@ -49,3 +49,6 @@ next-env.d.ts
 /ai-workflow/run-evidence/
 __pycache__/
 *.pyc
+
+# Local Graphify graph, reports and extraction caches
+/graphify-out/

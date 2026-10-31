@@ -4,6 +4,9 @@ import { FormEvent, useEffect, useRef, useState,type ReactNode } from "react";
 import {ClipboardCheck} from "lucide-react";
 import AuditTrail from "./components/AuditTrail";
 import OptimizationWorkflow from "./components/OptimizationWorkflow";
+import DomainNotice from "./components/DomainNotice";
+import type {DomainAssessment} from "./lib/domain";
+import {hrtChangeLabel} from "./lib/hrt";
 import {readOptimizationResponse,type OptimizationWorkflowState} from "./lib/optimization-workflow";
 
 type Inputs = {
@@ -32,6 +35,7 @@ type ModelTrace = {
 type Prediction = {
   biogas:number; methane:number; electricity:number; pressure:number; h2s:number; stability:number; bestSetpoints:Omit<Inputs,"feedstock">;
   retentionTime:{beforeHours:number;optimizedHours:number;reductionHours:number};
+  domainAssessment?:DomainAssessment;optimizedDomainAssessment?:DomainAssessment;
   recommendations:Recommendation[]; baseline:PlantOutput; optimized:PlantOutput;
   recommendedProjection:{biogas:number;methane:number;electricity:number;biogasChange:number;methaneChange:number;electricityChange:number;basis:string};
   equipmentStates:EquipmentState[];
@@ -203,7 +207,7 @@ function OperationsOverview({baselinePreview,result,loading,error,activeOutput,r
     {key:"electricity" as const,label:result?"AI electricity":"Baseline electricity",value:scaled(optimized?.electricity??baselinePreview?.electricity),unit:period.electricityUnit,note:baseline?`Baseline ${formatPeriodValue(scaled(baseline.electricity)!)} ${period.electricityUnit}`:"Before AI optimization",icon:"ϟ",tone:"blue"},
   ];
   const secondary=[
-    {label:"Optimized HRT",value:result?.retentionTime.optimizedHours,unit:"hours",note:result?`${format(result.retentionTime.beforeHours)} → ${format(result.retentionTime.optimizedHours)} hours after AI`:"Model days converted to hours",icon:"◷",tone:"green"},
+    {label:"Recommended HRT",value:result?.retentionTime.optimizedHours,unit:"hours",note:result?`${format(result.retentionTime.beforeHours)} → ${format(result.retentionTime.optimizedHours)} hours after AI`:"Model days converted to hours",icon:"◷",tone:"green"},
     {label:"Extra biogas",value:scaled(extraBiogas),unit:period.gasUnit,note:`AI output above ${periodMode} baseline`,icon:"↗",tone:"green",signed:true},
     {label:"H₂S removed",value:h2sRemoved,unit:"ppm",note:"Before-versus-after estimate",icon:"◎",tone:"amber"},
     {label:"CO₂e avoided",value:scaled(co2Avoided),unit:period.carbonUnit,note:`Derived ${periodMode} estimate`,icon:"♧",tone:"green"},
@@ -214,7 +218,7 @@ function OperationsOverview({baselinePreview,result,loading,error,activeOutput,r
     {label:"Biogas production",value:`+${formatPeriodValue((optimized.biogas-baseline.biogas)*period.factor)} ${period.gasUnit}`,detail:`${format((optimized.biogas/baseline.biogas-1)*100)}% above baseline`},
     {label:"Methane production",value:`+${formatPeriodValue((optimized.methane-baseline.methane)*period.factor)} ${period.methaneUnit}`,detail:`${format((optimized.methane/baseline.methane-1)*100)}% above baseline`},
     {label:"Electricity output",value:`+${formatPeriodValue((optimized.electricity-baseline.electricity)*period.factor)} ${period.electricityUnit}`,detail:`${format((optimized.electricity/baseline.electricity-1)*100)}% above baseline`},
-    {label:"Retention time",value:`${format(-result.retentionTime.reductionHours)} hours`,detail:`Selected HRT ${format(result.retentionTime.optimizedHours)} hours`},
+    {label:"HRT change",value:hrtChangeLabel(result.retentionTime.beforeHours,result.retentionTime.optimizedHours),detail:`Selected HRT ${format(result.retentionTime.optimizedHours)} hours`},
   ]:[];
   return <div className="operations-overview">
     <section className="operations-period-bar"><div><b>Production totals</b><span>{period.description}</span></div><nav aria-label="Production period">{(Object.keys(periodOptions) as PeriodMode[]).map(mode=><button type="button" key={mode} className={periodMode===mode?"active":""} aria-pressed={periodMode===mode} onClick={()=>setPeriodMode(mode)}>{periodOptions[mode].label}</button>)}</nav><small>{result?`Run ${result.runId.split("-")[0].toUpperCase()} · ${new Date(result.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`:"No completed run yet"}</small></section>
@@ -226,11 +230,12 @@ function OperationsOverview({baselinePreview,result,loading,error,activeOutput,r
     </section>
 
     <section className="overview-ai-summary" aria-live="polite">
-      <header><div><small>AI RECOMMENDATION</small><h2>What AI improved and what should change</h2></div><span>{result?`Based on run ${result.runId.split("-")[0].toUpperCase()}`:"Waiting for optimization"}</span></header>
+      <header><div><small>AI RECOMMENDATION</small><h2>Estimated changes and proposed settings</h2></div><span>{result?`Based on run ${result.runId.split("-")[0].toUpperCase()}`:"Waiting for optimization"}</span></header>
       {result?<div className="overview-ai-summary-body">
-        <div className="overview-improvements"><h3>What AI improved</h3>{improvements.map(item=><article key={item.label}><i>↗</i><p><b>{item.label}</b><span>{item.detail}</span></p><strong>{item.value}</strong></article>)}</div>
-        <div className="overview-actions"><h3>What should improve</h3>{recommendations.map(item=><article key={item.parameter}><i>✓</i><p><b>{item.parameter}</b><span>{item.detail}</span></p><strong>{format(item.current)} → {format(item.target)} <em>{item.unit}</em></strong></article>)}</div>
-      </div>:<div className="overview-ai-summary-empty"><span>✦</span><div><b>Run AI optimization to generate recommendations</b><p>The model will show production gains, HRT reduction, and the operating settings that should change.</p></div><button disabled={loading} onClick={onRun}>{loading?"Optimization running…":"Run AI optimization"}</button></div>}
+        <div className="overview-improvements"><h3>Estimated model differences</h3>{improvements.map(item=><article key={item.label}><i>↗</i><p><b>{item.label}</b><span>{item.detail}</span></p><strong>{item.value}</strong></article>)}</div>
+        <div className="overview-actions"><h3>Proposed operating changes</h3>{recommendations.map(item=><article key={item.parameter}><i>✓</i><p><b>{item.parameter}</b><span>{item.detail}</span></p><strong>{format(item.current)} → {format(item.target)} <em>{item.unit}</em></strong></article>)}</div>
+      </div>:<div className="overview-ai-summary-empty"><span>✦</span><div><b>Run AI optimization to generate recommendations</b><p>Estimated production differences, HRT change, and proposed operating settings. Plant benefits are not yet demonstrated.</p></div><button disabled={loading} onClick={onRun}>{loading?"Optimization running…":"Run AI optimization"}</button></div>}
+      {result&&<DomainNotice assessment={result.optimizedDomainAssessment} title="Recommended candidate support"/>}
     </section>
 
     <section className="scenario-preview-panel" aria-live="polite">
@@ -246,7 +251,7 @@ function OperationsOverview({baselinePreview,result,loading,error,activeOutput,r
     <div className="operations-detail-grid" id="recommendations">
       <section className="operations-panel stability-panel"><header><h2>Process stability</h2><span>Model estimate</span></header><div className="stability-body"><div className="stability-ring" style={{"--score":result?.stability||0} as React.CSSProperties}><b>{result?format(result.stability):"—"}</b><small>/ 100</small></div><dl><div><dt>pH</dt><dd>{result?format(result.bestSetpoints.ph):"—"}</dd></div><div><dt>Temperature</dt><dd>{result?`${format(result.bestSetpoints.temperature)} °C`:"—"}</dd></div><div><dt>OLR</dt><dd>{result?format(result.bestSetpoints.olr):"—"}</dd></div><div><dt>HRT after AI</dt><dd>{result?`${format(result.retentionTime.optimizedHours)} hours`:"—"}</dd></div></dl></div></section>
       <section className="operations-panel recommendations-panel"><header><h2>AI recommendations</h2><span>{result?`Rank #${result.modelTrace.optimization.selectedRank}`:"Waiting for model"}</span></header><div className="recommendation-table"><div><b>Parameter</b><b>Current</b><b>AI recommended</b></div>{recommendations.length?recommendations.map((item,index)=><div key={`${item.parameter}-${index}`}><b>{item.parameter}</b><span>{format(item.current)} {item.unit}</span><strong>{format(item.target)} {item.unit}</strong></div>):<p>Run AI optimization to calculate recommended setpoints.</p>}</div></section>
-      <section className="operations-panel gains-panel"><header><h2>Expected gains</h2><span>{period.description}</span></header>{result&&baseline&&optimized?<dl><div><dt>Extra biogas</dt><dd>+{formatPeriodValue((optimized.biogas-baseline.biogas)*period.factor)} {period.gasUnit}</dd></div><div><dt>Extra methane</dt><dd>+{formatPeriodValue((optimized.methane-baseline.methane)*period.factor)} {period.methaneUnit}</dd></div><div><dt>Extra electricity</dt><dd>+{formatPeriodValue((optimized.electricity-baseline.electricity)*period.factor)} {period.electricityUnit}</dd></div><div><dt>H₂S removed</dt><dd>{format(baseline.h2s-optimized.h2s)} ppm</dd></div></dl>:<p>Expected gains appear after the model run.</p>}<button disabled={loading} onClick={onRun}>{loading?"Optimization running…":"Run AI optimization"}</button></section>
+      <section className="operations-panel gains-panel"><header><h2>Estimated differences</h2><span>{period.description}</span></header>{result&&baseline&&optimized?<dl><div><dt>Extra biogas</dt><dd>+{formatPeriodValue((optimized.biogas-baseline.biogas)*period.factor)} {period.gasUnit}</dd></div><div><dt>Extra methane</dt><dd>+{formatPeriodValue((optimized.methane-baseline.methane)*period.factor)} {period.methaneUnit}</dd></div><div><dt>Extra electricity</dt><dd>+{formatPeriodValue((optimized.electricity-baseline.electricity)*period.factor)} {period.electricityUnit}</dd></div><div><dt>H₂S removed</dt><dd>{format(baseline.h2s-optimized.h2s)} ppm</dd></div></dl>:<p>Expected gains appear after the model run.</p>}<button disabled={loading} onClick={onRun}>{loading?"Optimization running…":"Run AI optimization"}</button></section>
     </div>
 
     <div className="operations-evidence-grid">
@@ -367,7 +372,7 @@ function FocusedOutputPage({outputKey,result,runInputs,inputs,loading,prediction
   const conditionsClose=result?[
     Math.abs(completedInputs.temperature-result.bestSetpoints.temperature)<=.5,
     Math.abs(completedInputs.ph-result.bestSetpoints.ph)<=.1,
-    result.retentionTime.reductionHours>0,
+    Math.abs(result.retentionTime.optimizedHours-result.retentionTime.beforeHours)<=24,
   ].filter(Boolean).length:0;
   const curveValue=(point:ModelCurvePoint)=>point[outputKey];
   return <div className="focused-output-page" style={{"--focus-accent":meta.color} as React.CSSProperties}>
@@ -383,7 +388,7 @@ function FocusedOutputPage({outputKey,result,runInputs,inputs,loading,prediction
 
     <div className="focused-kpis">
       <article><small>Current predicted {meta.label.toLowerCase()}</small><b>{result?format(meta.after(result)):"Waiting"}</b><span>{result?meta.unit:"Run calculation"}</span></article>
-      <article><small>Optimal retention time</small><b>{result?format(result.retentionTime.optimizedHours):"—"}</b><span>{result?`hours · change ${format(-result.retentionTime.reductionHours)}h`:"Run calculation"}</span></article>
+      <article><small>Recommended retention time</small><b>{result?format(result.retentionTime.optimizedHours):"—"}</b><span>{result?`hours · ${hrtChangeLabel(result.retentionTime.beforeHours,result.retentionTime.optimizedHours)}`:"Run calculation"}</span></article>
       <article><small>Optimal pH</small><b>{result?format(result.bestSetpoints.ph):"—"}</b><span>{result?"modeled target":"Run calculation"}</span></article>
     </div>
 
