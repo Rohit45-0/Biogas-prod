@@ -34,7 +34,8 @@ try{
   await study.getByRole("button",{name:"Ask Copilot",exact:true}).click();const chat=study.getByRole("complementary",{name:"Hours-scale Copilot"});
   await chat.getByLabel("Ask about the hours-scale run").fill("Why this HRT?");await chat.getByRole("button",{name:"Ask Copilot",exact:true}).click();
   await chat.locator('.chat-messages .ai').filter({hasText:"The selected HRT is 7.88 hours"}).waitFor();
-  assert.doesNotMatch(await chat.innerText(),/528|602|22 days/);await chat.getByLabel("Close Copilot").click();
+  // Check the model answer, not the randomly generated saved-run ID in the header.
+  assert.doesNotMatch(await chat.locator('.chat-messages .ai').last().innerText(),/\b(?:528|602)(?:\.0+)?\s*(?:hours|h)\b|\b22(?:\.0+)?\s*days\b/i);await chat.getByLabel("Close Copilot").click();
   assert.match(await study.locator(".hr-kpis").innerText(),/kWh\/day/);assert.match(await study.locator(".hr-kpis").innerText(),/m³ CH₄\/day/);
   await page.screenshot({path:path.join(out,"overview-1440.png"),fullPage:true});
   for(const [label,expected] of [["Biogas","Biogas production"],["Methane","Methane yield"],["Electricity","Electricity potential"],["HRT in hours","HRT in hours"],["AI optimizer","HRT scenario optimizer"]]){
