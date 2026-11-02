@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { retrieveKnowledge } from "../../lib/rag";
 import { getSession } from "../../lib/auth";
+import {getEvidence,validRunId,verifyEvidence} from "../../lib/audit";
+import type {ResearchResult} from "../../lib/hrt-research-execution";
 
 type Inputs = { feedstock?:string; feedRate?: number; temperature?: number; ph?: number; olr?: number; hrt?: number; codIn?:number; vfa?:number; mixing?:number };
 type Prediction = { biogas?: number; methane?:number; electricity?: number; carbon?: number; modelName?:string; runId?:string; alerts?:{label:string;status:string;message:string;value:number;unit:string;limit:string}[]; recommendations?:{title:string;detail:string}[]; bestSetpoints?: { feedRate:number; temperature:number; ph:number; olr:number; hrt:number; codIn:number; vfa:number; mixing:number } };
@@ -65,10 +67,33 @@ async function generateAnswer(question: string, inputs: Inputs, prediction: Pred
 }
 
 export async function POST(req: Request) {
-  if (!await getSession(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { question, inputs = {}, prediction = null, history = [] } = await req.json() as { question?: string; inputs?: Inputs; prediction?: Prediction | null; history?: Message[] };
+  const session=await getSession(req);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { question, inputs = {}, prediction = null, history = [], mode, researchRunId } = await req.json() as { question?: string; inputs?: Inputs; prediction?: Prediction | null; history?: Message[];mode?:string;researchRunId?:string };
   const text = String(question ?? "").trim();
   if (!text) return NextResponse.json({ answer: "Please enter a question." }, { status: 400 });
+
+  if(mode==="HOURS_RESEARCH"){
+    if(!researchRunId)return NextResponse.json({answer:"Run and save an hours-scale study first. The active model evaluates HRT from 2 to 24 hours using synthetic workbook data; plant performance has not yet been validated.",sources:[]});
+    if(session.role!=="admin")return NextResponse.json({error:"Admin access required to read saved research evidence"},{status:403});
+    if(typeof researchRunId!=="string"||!validRunId(researchRunId))return NextResponse.json({error:"Invalid research run ID"},{status:400});
+    try{
+      const record=await getEvidence(researchRunId);
+      if(!record||record.kind!=="hrt_research")return NextResponse.json({error:"Hours-scale run not found"},{status:404});
+      if(!verifyEvidence(record))return NextResponse.json({error:"Saved research evidence failed integrity verification"},{status:409});
+      const result=record.response as ResearchResult,p=result.selected,q=text.toLowerCase();
+      const outputs=`This saved run estimates ${p.biogasM3Day.toFixed(2)} m³/day biogas, ${p.methaneM3Day.toFixed(2)} m³ CH₄/day methane and ${p.electricityKwhDay.toFixed(2)} kWh/day electricity potential.`;
+      const goal=result.request.objective==="target_hrt"?"It evaluates the specific HRT you entered.":result.request.objective==="maximum_energy"?"It selects the highest predicted electricity output along the hours-scale trajectory.":`It selects the shortest evaluated HRT retaining at least ${result.request.retainedMethanePct}% of the modelled peak methane output.`;
+      let answer=`The selected HRT is ${p.hrtHours.toFixed(2)} hours, compared with the entered ${result.retentionTime.beforeHours.toFixed(2)} hours. ${goal} The signed change is ${result.retentionTime.changeHours.toFixed(2)} hours (${result.retentionTime.direction}).`;
+      if(/recommend|setpoint|temperature|ph|feed|loading/.test(q))answer=`The selected scenario uses HRT ${p.hrtHours.toFixed(2)} hours, temperature ${p.temperature.toFixed(2)} °C, pH ${p.ph.toFixed(2)}, feed rate ${p.feedRate.toFixed(2)} kg VS/day and organic loading ${p.olr.toFixed(2)} kg VS/m³/day. These process settings vary together along the fitted trajectory; separate control effects are not established.`;
+      else if(/model|train|accur|data/.test(q))answer=`This run uses ${result.modelVersion}, a fitted hours-scale model based on 500 synthetic workbook rows. It evaluates 2,000 candidate HRT points within 2–24 hours. Synthetic evaluation scores do not establish plant accuracy; prediction intervals are not calibrated.`;
+      else if(/biogas|methane|electric|production/.test(q))answer=`${outputs} Electricity potential is methane volume × 9.97 kWh/m³ × 0.36, using the workbook assumptions.`;
+      else answer+=` ${outputs}`;
+      if(!result.goal.satisfied)answer+=" This selected target does not meet the requested methane-retention goal.";
+      answer+=" These are synthetic research estimates; actual plant performance remains to be validated.";
+      return NextResponse.json({answer,sources:[result.source.file],runId:record.id,retrieval:"verified_saved_research_record"});
+    }catch{return NextResponse.json({error:"Saved research evidence could not be read"},{status:503});}
+  }
 
   const retrieved = await retrieveKnowledge(text);
   const context = retrieved.chunks.map((chunk, index) => `[${index + 1}] ${chunk.source}: ${chunk.text}`).join("\n\n");

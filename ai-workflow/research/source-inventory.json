@@ -1,0 +1,159 @@
+{
+  "files": [
+    {
+      "file": "10 more cases with days less in HRT on ai and on litterature.xlsx",
+      "sha256": "3f29a7c0fb8bca87b4735f44c1777652fb91f6127d9d90425a8b3981bc14de54",
+      "duplicateOf": null,
+      "sheets": [
+        {
+          "name": "Hours-Scale with AI SYnthetic",
+          "nonEmptyRows": 16,
+          "duplicateOf": null
+        },
+        {
+          "name": "Projected Runs 11-13",
+          "nonEmptyRows": 6,
+          "duplicateOf": null
+        }
+      ],
+      "researchTraining": false,
+      "role": "Supporting or duplicated reference data"
+    },
+    {
+      "file": "AQUAIVOLT_10_Biogas_Optimization_10Scenarios.xlsx",
+      "sha256": "bdc42fa48fa15b1917a52e3e6d07ea8cb7280eaffd9f0fb07084721d8a4b2a09",
+      "duplicateOf": null,
+      "sheets": [
+        {
+          "name": "10_Optimization_Scenarios",
+          "nonEmptyRows": 11,
+          "duplicateOf": null
+        },
+        {
+          "name": "Field_Explanation",
+          "nonEmptyRows": 12,
+          "duplicateOf": null
+        }
+      ],
+      "researchTraining": false,
+      "role": "Day-scale model assessment"
+    },
+    {
+      "file": "AQUAIVOLT_AI_Biogas_10_Run_Dataset.xlsx",
+      "sha256": "3c31bed29bdbda9eaf74729bff9463f1c56cee5289d6811222329ceb00ea1669",
+      "duplicateOf": null,
+      "sheets": [
+        {
+          "name": "AI Validation Dataset",
+          "nonEmptyRows": 13,
+          "duplicateOf": null
+        },
+        {
+          "name": "Executive Dashboard",
+          "nonEmptyRows": 14,
+          "duplicateOf": null
+        },
+        {
+          "name": "Assumptions & Audit",
+          "nonEmptyRows": 9,
+          "duplicateOf": null
+        }
+      ],
+      "researchTraining": false,
+      "role": "Supporting or duplicated reference data"
+    },
+    {
+      "file": "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template (1).xlsx",
+      "sha256": "27169169eda9c8b81d950d617108a8caf4206972287bdbe94000b7a05c309dfe",
+      "duplicateOf": null,
+      "sheets": [
+        {
+          "name": "SCADA_Data",
+          "nonEmptyRows": 1001,
+          "duplicateOf": null
+        },
+        {
+          "name": "README",
+          "nonEmptyRows": 4,
+          "duplicateOf": null
+        }
+      ],
+      "researchTraining": false,
+      "role": "Supporting or duplicated reference data"
+    },
+    {
+      "file": "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template.xlsx",
+      "sha256": "27169169eda9c8b81d950d617108a8caf4206972287bdbe94000b7a05c309dfe",
+      "duplicateOf": "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template (1).xlsx",
+      "sheets": [
+        {
+          "name": "SCADA_Data",
+          "nonEmptyRows": 1001,
+          "duplicateOf": "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template (1).xlsx / SCADA_Data"
+        },
+        {
+          "name": "README",
+          "nonEmptyRows": 4,
+          "duplicateOf": "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template (1).xlsx / README"
+        }
+      ],
+      "researchTraining": false,
+      "role": "Day-scale model assessment"
+    },
+    {
+      "file": "AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx",
+      "sha256": "ceb1c5d4f3e87f51d283e54bbf03ebf67a236a4322e6660c698b2a87a88bb5ad",
+      "duplicateOf": null,
+      "sheets": [
+        {
+          "name": "Hours-Scale with AI SYnthetic",
+          "nonEmptyRows": 16,
+          "duplicateOf": "10 more cases with days less in HRT on ai and on litterature.xlsx / Hours-Scale with AI SYnthetic"
+        },
+        {
+          "name": "Projected Runs 11-13",
+          "nonEmptyRows": 6,
+          "duplicateOf": "10 more cases with days less in HRT on ai and on litterature.xlsx / Projected Runs 11-13"
+        },
+        {
+          "name": "Hours-Scale AI Synthetic 500",
+          "nonEmptyRows": 504,
+          "duplicateOf": null
+        }
+      ],
+      "researchTraining": true,
+      "role": "Hours-scale synthetic trajectory training"
+    },
+    {
+      "file": "AQUAIVOLT_Projected_Scenarios_HRT_below6h_500.xlsx",
+      "sha256": "944da86a8246735a8ed6dd8d1cc9bf0ff2c04fd875629ce31c33f46273f4ef3f",
+      "duplicateOf": null,
+      "sheets": [
+        {
+          "name": "Projected Scenarios <6h (x500)",
+          "nonEmptyRows": 505,
+          "duplicateOf": null
+        },
+        {
+          "name": "Hours-Scale AI Concept",
+          "nonEmptyRows": 16,
+          "duplicateOf": "10 more cases with days less in HRT on ai and on litterature.xlsx / Hours-Scale with AI SYnthetic"
+        },
+        {
+          "name": "Projected Runs 11-13",
+          "nonEmptyRows": 6,
+          "duplicateOf": "10 more cases with days less in HRT on ai and on litterature.xlsx / Projected Runs 11-13"
+        },
+        {
+          "name": "Sheet2",
+          "nonEmptyRows": 0,
+          "duplicateOf": null
+        }
+      ],
+      "researchTraining": false,
+      "role": "Excluded extreme extrapolation; supporting context only"
+    }
+  ],
+  "independentPlantMeasurements": 0,
+  "note": "Duplicate files and repeated sheets are never treated as additional independent observations."
+}

@@ -1,0 +1,334 @@
+{
+  "version": "research-study-2026-11-02",
+  "scada": {
+    "source": {
+      "file": "AQUAIVOLT_AI_Biogas_SCADA_Dataset_Template.xlsx",
+      "sheet": "SCADA_Data",
+      "sha256": "27169169eda9c8b81d950d617108a8caf4206972287bdbe94000b7a05c309dfe"
+    },
+    "trainRows": 800,
+    "testRows": 200,
+    "selection": "Four chronological development folds with a four-row gap inside the first 800 rows",
+    "selected": "Mean baseline",
+    "selectedLearner": "Ridge alpha 1000",
+    "ranking": [
+      {
+        "name": "Mean baseline",
+        "meanNormalizedMae": 0.8874209388113475,
+        "folds": [
+          0.9017505828751277,
+          0.865129155462966,
+          0.8945027193983872,
+          0.8883012975089093
+        ]
+      },
+      {
+        "name": "Ridge alpha 1000",
+        "meanNormalizedMae": 0.8877642564117447,
+        "folds": [
+          0.9021396842412684,
+          0.86599250740516,
+          0.8931875437424354,
+          0.8897372902581151
+        ]
+      },
+      {
+        "name": "Random forest",
+        "meanNormalizedMae": 0.8903131993223953,
+        "folds": [
+          0.9002823666068337,
+          0.868901297732112,
+          0.8917549194259617,
+          0.9003142135246738
+        ]
+      },
+      {
+        "name": "Extra Trees",
+        "meanNormalizedMae": 0.890532229169969,
+        "folds": [
+          0.9031955507798051,
+          0.8683536353483662,
+          0.8925440139431089,
+          0.8980357166085958
+        ]
+      },
+      {
+        "name": "KNN 35",
+        "meanNormalizedMae": 0.8908025680306454,
+        "folds": [
+          0.9076031952298553,
+          0.8646851037856168,
+          0.8952260859453715,
+          0.8956958871617383
+        ]
+      },
+      {
+        "name": "Ridge alpha 100",
+        "meanNormalizedMae": 0.8908147545077112,
+        "folds": [
+          0.9052614330973999,
+          0.8694386273603708,
+          0.8930630943400907,
+          0.8954958632329832
+        ]
+      },
+      {
+        "name": "Gradient boosting",
+        "meanNormalizedMae": 0.8928356830909777,
+        "folds": [
+          0.9084557684158775,
+          0.8723761601875796,
+          0.8851978628438367,
+          0.9053129409166171
+        ]
+      },
+      {
+        "name": "Ridge alpha 10",
+        "meanNormalizedMae": 0.8945150539059908,
+        "folds": [
+          0.9086885985954094,
+          0.8755094028358785,
+          0.8950311824869429,
+          0.8988310317057326
+        ]
+      },
+      {
+        "name": "Ridge alpha 1",
+        "meanNormalizedMae": 0.8957735372636563,
+        "folds": [
+          0.9105960049948306,
+          0.8775091503277209,
+          0.895583855022434,
+          0.8994051387096395
+        ]
+      },
+      {
+        "name": "Ridge alpha 0.1",
+        "meanNormalizedMae": 0.8959591244802185,
+        "folds": [
+          0.9109719241242283,
+          0.8777489560937758,
+          0.8956473300456915,
+          0.8994682876571788
+        ]
+      },
+      {
+        "name": "KNN 15",
+        "meanNormalizedMae": 0.9089840074567384,
+        "folds": [
+          0.9212322047941481,
+          0.8883228096869935,
+          0.9135692870799795,
+          0.9128117282658321
+        ]
+      }
+    ],
+    "evaluation": {
+      "Mean baseline": {
+        "targets": [
+          {
+            "key": "Gas_Flow_m3h",
+            "unit": "m3/hour",
+            "mae": 91.9548075,
+            "rmse": 108.037471668922,
+            "r2": -0.02573935098926272
+          },
+          {
+            "key": "CH4_pct",
+            "unit": "%",
+            "mae": 4.097978749999997,
+            "rmse": 4.7525693633976775,
+            "r2": -0.008763271284776053
+          },
+          {
+            "key": "Generator_kW",
+            "unit": "kW",
+            "mae": 24.725273124999998,
+            "rmse": 28.26458238575986,
+            "r2": -0.002431571581393399
+          }
+        ],
+        "meanNormalizedMae": 0.8343479219537159
+      },
+      "Ridge alpha 1000": {
+        "targets": [
+          {
+            "key": "Gas_Flow_m3h",
+            "unit": "m3/hour",
+            "mae": 91.7914590872785,
+            "rmse": 107.63454429574095,
+            "r2": -0.018102597657685404
+          },
+          {
+            "key": "CH4_pct",
+            "unit": "%",
+            "mae": 4.0895927044169555,
+            "rmse": 4.7400075802940504,
+            "r2": -0.003437681024262007
+          },
+          {
+            "key": "Generator_kW",
+            "unit": "kW",
+            "mae": 24.778585475387708,
+            "rmse": 28.28881657795234,
+            "r2": -0.00415128804873266
+          }
+        ],
+        "meanNormalizedMae": 0.8338936853327011
+      }
+    },
+    "archivedRidge": {
+      "Gas_Flow_m3h": {
+        "MAE": 91.85007276477012,
+        "RMSE": 107.51525289061773,
+        "R2": -0.01584712125472132
+      },
+      "CH4_pct": {
+        "MAE": 4.079243256003361,
+        "RMSE": 4.718828354308548,
+        "R2": 0.005509374039200043
+      },
+      "Generator_kW": {
+        "MAE": 24.905344779290758,
+        "RMSE": 28.467896149126748,
+        "R2": -0.01690489033620768
+      },
+      "overall_normalized_MAE": 0.8348201719190088
+    },
+    "status": "EXISTING_ARTIFACT_UNCHANGED",
+    "limitations": [
+      "This is a synthetic template. The final 200 rows were already used in the archived audit and are not a new independent holdout.",
+      "Model selection here uses only the first 800 rows. Archived and new per-target errors share the nominal 800/200 chronological split.",
+      "A mean baseline beating learned models indicates weak predictive signal; it is not evidence of AI plant improvement."
+    ]
+  },
+  "anchors": {
+    "source": {
+      "file": "AQUAIVOLT_10_Biogas_Optimization_10Scenarios.xlsx",
+      "sheet": "10_Optimization_Scenarios",
+      "sha256": "bdc42fa48fa15b1917a52e3e6d07ea8cb7280eaffd9f0fb07084721d8a4b2a09"
+    },
+    "rows": 10,
+    "method": "Nested leave-one-out: each outer test row excluded from candidate selection; inner leave-one-out on nine rows",
+    "targets": [
+      {
+        "key": "Gas Flow (m3/h) After AI",
+        "unit": "m3/hour",
+        "mae": 8.333532904444573,
+        "rmse": 11.542593942503453,
+        "r2": 0.5844437948862562
+      },
+      {
+        "key": "CH4 (%) After AI",
+        "unit": "%",
+        "mae": 1.1095058852225528,
+        "rmse": 1.237306180981253,
+        "r2": 0.6013212016941634
+      },
+      {
+        "key": "Generator (kW) After AI",
+        "unit": "kW",
+        "mae": 3.400627404344813,
+        "rmse": 4.581964748102944,
+        "r2": 0.5076360001674936
+      }
+    ],
+    "baseline": [
+      {
+        "key": "Gas Flow (m3/h) After AI",
+        "unit": "m3/hour",
+        "mae": 15.955555555555552,
+        "rmse": 19.895095245180773,
+        "r2": -0.2345679012345674
+      },
+      {
+        "key": "CH4 (%) After AI",
+        "unit": "%",
+        "mae": 1.8666666666666671,
+        "rmse": 2.17732421580727,
+        "r2": -0.23456790123456872
+      },
+      {
+        "key": "Generator (kW) After AI",
+        "unit": "kW",
+        "mae": 5.866666666666667,
+        "rmse": 7.255478985473116,
+        "r2": -0.23456790123456805
+      }
+    ],
+    "outerSelections": [
+      {
+        "heldOutSource": "1",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "2",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "3",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "4",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "5",
+        "selected": "KNN 2"
+      },
+      {
+        "heldOutSource": "6",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "7",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "8",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "9",
+        "selected": "Ridge alpha 0.1"
+      },
+      {
+        "heldOutSource": "10",
+        "selected": "Ridge alpha 0.1"
+      }
+    ],
+    "selectionCounts": {
+      "Ridge alpha 0.1": 9,
+      "KNN 2": 1
+    },
+    "archivedGradientBoosting": {
+      "Gas Flow (m3/h) After AI": {
+        "MAE": 9.580741615985056,
+        "RMSE": 12.498821316780761,
+        "R2": 0.5127396702884716
+      },
+      "CH4 (%) After AI": {
+        "MAE": 1.3813286618447436,
+        "RMSE": 1.5372203781889429,
+        "R2": 0.3846233096043342
+      },
+      "Generator (kW) After AI": {
+        "MAE": 3.941674141950366,
+        "RMSE": 4.915750142943742,
+        "R2": 0.4332880049753419
+      },
+      "overall_normalized_MAE": 0.6145360455228502
+    },
+    "status": "EXISTING_ARTIFACT_UNCHANGED",
+    "limitations": [
+      "Ten scenario rows do not provide independent plant validation or reliable feedstock-specific generalization.",
+      "The archived non-nested leave-one-out result was used for model selection; the nested estimate here is a stricter assessment and not an identical evaluation protocol.",
+      "No deployed artifact is replaced based on these small, synthetic assessments."
+    ]
+  },
+  "libraries": {
+    "numpy": "2.5.3",
+    "sklearn": "1.9.1"
+  }
+}

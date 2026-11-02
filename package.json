@@ -13,6 +13,7 @@
     "build:sites": "vinext build",
     "test": "pnpm run build && node --test tests/*.test.mjs",
     "test:ui": "node scripts/verify-audit-ui.mjs",
+    "test:research-ui": "node scripts/verify-research-ui.mjs",
     "graphify": "node scripts/graphify.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

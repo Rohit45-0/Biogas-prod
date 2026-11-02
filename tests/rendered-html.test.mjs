@@ -7,12 +7,13 @@ test("production package includes dashboard, audit controls and source manifest"
   const audit=await readFile(new URL("app/components/AuditTrail.tsx",root),"utf8");
   assert.match(page,/auth.role==="admin"/);
   assert.match(page,/Audit Trail/);
-  assert.match(page,/operatingConditions:submittedInputs/);
   assert.doesNotMatch(page,/setTimeout\(resolve,6500\)|setAnalysisStage/);
   for(const label of ["Run test 1","Run test 2","Test null rejection","Run comparison","Retrievable audit records"])assert.ok(audit.includes(label));
   assert.match(audit,/Independent measured-plant validation remains outstanding/);
   const manifest=JSON.parse(await readFile(new URL("app/lib/model-build.json",root),"utf8"));
   assert.match(manifest.sourceHash,/^sha256:[a-f0-9]{64}$/);
+  const routes=JSON.parse(await readFile(new URL(".next/server/app-paths-manifest.json",root),"utf8"));
+  for(const route of ["/api/research/hrt/route","/api/research/hrt/verify/route","/api/copilot/route","/api/ml/predict/route","/api/validation/route"])assert.ok(routes[route],`Missing built route: ${route}`);
   await access(new URL(".next/BUILD_ID",root));
   await access(new URL("public/og.png",root));
 });

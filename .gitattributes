@@ -1,0 +1,4 @@
+# Preserve the byte identity of the registry used by archived ML audit records.
+ai-workflow/models/onnx/manifest.json text eol=crlf
+# Portable research artifacts have one byte representation on every host.
+ai-workflow/research/*.json text eol=lf

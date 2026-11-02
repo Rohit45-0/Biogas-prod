@@ -24,6 +24,7 @@ jobs:
       - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
+      - run: pnpm test:research-ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -31,4 +32,6 @@ jobs:
           path: |
             test-results/audit-remediation-ui/*.png
             test-results/audit-remediation-ui/summary.json
+            test-results/hrt-research-ui/*.png
+            test-results/hrt-research-ui/summary.json
           if-no-files-found: ignore
