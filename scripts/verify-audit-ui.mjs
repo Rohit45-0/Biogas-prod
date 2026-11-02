@@ -52,7 +52,7 @@ try{
   await plant.getByRole('button',{name:'Calculate measured errors'}).click();await plant.getByRole('heading',{name:'1 reported observations'}).waitFor();
   assert.match(await plant.innerText(),/REVIEW REQUIRED/);assert.equal(await plant.getByRole('cell',{name:'Not defined',exact:true}).count(),6);
   await page.screenshot({path:path.join(out,'desktop-plant-validation.png'),fullPage:true});
-  await page.getByRole('button',{name:'Overview',exact:true}).first().click();await page.locator('.run-ai-button').click();await page.getByRole('button',{name:'View results',exact:true}).waitFor();await page.getByRole('button',{name:'View results',exact:true}).click();
+  await page.getByRole('button',{name:'Day-scale reference',exact:true}).click();await page.locator('.run-ai-button').click();await page.getByRole('button',{name:'View results',exact:true}).waitFor();await page.getByRole('button',{name:'View results',exact:true}).click();
   assert.match(await page.locator('.overview-improvements').innerText(),/HRT change/);assert.doesNotMatch(await page.locator('.overview-ai-summary').innerText(),/HRT reduction|What AI improved/);
   await page.screenshot({path:path.join(out,'desktop-overview.png'),fullPage:true});
   const widths=[];

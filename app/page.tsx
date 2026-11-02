@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState,type ReactNode } from "react";
-import {ClipboardCheck} from "lucide-react";
+import {ClipboardCheck,FlaskConical} from "lucide-react";
+import HrtResearchWorkspace,{type ResearchView} from "./components/HrtResearchWorkspace";
 import AuditTrail from "./components/AuditTrail";
 import OptimizationWorkflow from "./components/OptimizationWorkflow";
 import DomainNotice from "./components/DomainNotice";
@@ -76,6 +77,9 @@ export default function Home(){
   const [runs,setRuns]=useState<RunRecord[]>([]);
   const [activeOutput,setActiveOutput]=useState<OutputKey>("biogas");
   const [workspaceView,setWorkspaceView]=useState<"overview"|"audit"|OutputKey>("overview");
+  const [researchMode,setResearchMode]=useState(true);
+  const [researchView,setResearchView]=useState<ResearchView>("overview");
+  const [auditRunId,setAuditRunId]=useState("");
   const [loading,setLoading]=useState(false);
   const [predictionError,setPredictionError]=useState("");
   const [workflow,setWorkflow]=useState<OptimizationWorkflowState|null>(null);
@@ -130,6 +134,8 @@ export default function Home(){
     setWorkspaceView("overview");
     window.setTimeout(()=>document.getElementById(id||"overview")?.scrollIntoView(),0);
   }
+  function openResearch(view:ResearchView="overview"){setResearchMode(true);setResearchView(view);setWorkspaceView("overview");window.scrollTo({top:0});}
+  function openAudit(id=""){setAuditRunId(id);setWorkspaceView("audit");setChatOpen(false);window.scrollTo({top:0});}
 
   if(checking)return <main className="loading-screen"><span>◒</span><b>Opening Aquaivolt…</b></main>;
   if(!auth)return <LoginScreen username={username} password={password} error={loginError} busy={loginBusy} onUsername={setUsername} onPassword={setPassword} onSubmit={login}/>;
@@ -138,21 +144,27 @@ export default function Home(){
   return <main className="simple-shell">
     <aside className="simple-sidebar">
       <div className="simple-brand"><span>◒</span><b>AQUAIVOLT<small>WASTE TO ENERGY</small></b></div>
+      <div className="research-mode-switch"><small>MODEL WORKSPACE</small><button className={researchMode?"selected":""} onClick={()=>openResearch()}>Hours-scale research</button><button className={!researchMode?"selected":""} onClick={()=>{setResearchMode(false);openOverviewSection();}}>Day-scale reference</button></div>
       <nav>
+        {researchMode?<>{([
+          ["overview","⌂","Overview"],["workbook","▦","Workbook AI reading"],["biogas","◒","Biogas"],["methane","◆","Methane"],["electricity","ϟ","Electricity"],["hrt","◷","HRT in hours"],["process","⌁","Process monitor"],["optimizer","✦","AI optimizer"],["reports","≡","AI & KPI reports"],["sources","▤","Data sources"],
+        ] as [ResearchView,string,string][]).map(([view,icon,label])=><button key={view} aria-label={label} className={workspaceView!=="audit"&&researchView===view?"active":""} onClick={()=>openResearch(view)}><span aria-hidden="true">{icon}</span>{label}</button>)}</>:<>
         <button className={workspaceView==="overview"?"active":""} onClick={()=>openOverviewSection()}><span>⌂</span>Overview</button>
         {(Object.keys(outputs) as OutputKey[]).map(key=><button key={key} className={workspaceView===key?"active":""} onClick={()=>{setActiveOutput(key);setWorkspaceView(key);window.scrollTo({top:0});}}><span>{outputs[key].icon}</span>{outputs[key].label}</button>)}
         <button onClick={()=>openOverviewSection("comparison")}><span>⌁</span>Process monitor</button>
         <button onClick={()=>openOverviewSection("recommendations")}><span>✦</span>AI optimizer</button>
         <button onClick={()=>openOverviewSection("history")}><span>≡</span>Run history</button>
-        {auth.role==="admin"&&<button className={workspaceView==="audit"?"active":""} onClick={()=>{setWorkspaceView("audit");setChatOpen(false);window.scrollTo({top:0});}}><span><ClipboardCheck size={17} style={{display:"inline",verticalAlign:"middle"}}/></span>Audit Trail</button>}
+        </>}
+        {auth.role==="admin"&&<button className={workspaceView==="audit"?"active":""} onClick={()=>openAudit()}><span><ClipboardCheck size={17} style={{display:"inline",verticalAlign:"middle"}}/></span>Audit Trail</button>}
       </nav>
-      <div className="side-note"><b>SYSTEM STATUS</b><span>ADVISORY MODEL</span><small>2,000-candidate engine ready<br/>PLC / IoT not connected</small></div>
+      <div className="side-note"><b>SYSTEM STATUS</b><span>{researchMode?"RESEARCH MODEL":"ADVISORY MODEL"}</span><small>{researchMode?"500 synthetic source rows":"2,000-candidate engine ready"}<br/>PLC / IoT not connected</small></div>
       <button className="side-logout" onClick={()=>void logout()}>Log out</button>
     </aside>
 
     <section className="simple-workspace" id="overview">
-      {workspaceView==="audit"&&auth.role==="admin"&&<AuditTrail onOverview={()=>openOverviewSection()}/>}
-      {workspaceView!=="overview"&&workspaceView!=="audit"&&<FocusedOutputPage
+      {workspaceView==="audit"&&auth.role==="admin"&&<AuditTrail initialRunId={auditRunId} onOverview={()=>openOverviewSection()}/>}
+      <div hidden={!researchMode||workspaceView==="audit"}><HrtResearchWorkspace view={researchView} role={auth.role} onView={openResearch} onAudit={openAudit}/></div>
+      {!researchMode&&workspaceView!=="overview"&&workspaceView!=="audit"&&<FocusedOutputPage
         outputKey={workspaceView}
         result={result}
         runInputs={lastRunInputs}
@@ -164,11 +176,12 @@ export default function Home(){
         onOverview={()=>openOverviewSection()}
         workflow={workflowPanel}
       />}
-      <div className={`overview-workspace ${workspaceView==="overview"?"":"workspace-hidden"}`}>
+      <div className={`overview-workspace ${!researchMode&&workspaceView==="overview"?"":"workspace-hidden"}`}>
       <header className="simple-header operations-header">
         <div><p>AI PRODUCTION CENTER</p><h1>AQUAIVOLT</h1><span>Baseline and optimized model estimates from one reference-data run.</span></div>
         <div className="header-tools"><span className="system-ready"><i/>Prototype engine</span><span className="plc-status"><i/>PLC not connected</span><button className="copilot-button" onClick={()=>setChatOpen(true)}>✦ Ask Copilot</button><button className="run-ai-button" disabled={loading} onClick={()=>void predict()}>{loading?"Running optimization…":"Run AI optimization"}</button><div className="header-user-actions"><div className="user-chip"><b>{auth.username.slice(0,2).toUpperCase()}</b><span>{auth.username}<small>{auth.role}</small></span></div><button className="header-logout-button" onClick={()=>void logout()} title="Log out" aria-label="Log out">↪</button></div></div>
       </header>
+      <section className="hr-entry-card"><FlaskConical size={27}/><div><h2>Explore HRT in hours</h2><p>Use the separately trained 2–24 hour synthetic trajectory, with trade-off charts and audit evidence.</p></div><button onClick={()=>openResearch("hrt")}>Open HRT research →</button></section>
 
       {workspaceView==="overview"&&workflowPanel}
       <OperationsOverview baselinePreview={baselinePreview} result={result} loading={loading} error={predictionError} activeOutput={activeOutput} runs={runs} onOutput={key=>setActiveOutput(key)} onRun={()=>void predict()} onOpenOutput={key=>{setActiveOutput(key);setWorkspaceView(key);window.scrollTo({top:0});}}/>

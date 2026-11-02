@@ -1,0 +1,904 @@
+{
+  "version": "hours-research-1.0.0",
+  "name": "Hours-scale synthetic trajectory model",
+  "input": {
+    "key": "hrtHours",
+    "min": 2,
+    "max": 24,
+    "offset": 13,
+    "scale": 11
+  },
+  "basis": {
+    "kind": "polynomial",
+    "degree": 5
+  },
+  "outputKeys": [
+    "biogasM3Day",
+    "methanePct",
+    "feedRate",
+    "temperature",
+    "ph",
+    "olr",
+    "h2sBeforePpm",
+    "h2sAfterPpm",
+    "stabilityPct"
+  ],
+  "coefficients": {
+    "biogasM3Day": [
+      74.55681784099632,
+      -9.96330622723437,
+      2.471228688173903,
+      -2.0213182761009576,
+      -1.4666418677297492,
+      2.5740989266464167
+    ],
+    "methanePct": [
+      55.35053969093126,
+      11.104622583832384,
+      -7.649623749541012,
+      9.655130155281526,
+      0.21260971093620606,
+      -5.0475237206163674
+    ],
+    "feedRate": [
+      892.2744365409237,
+      -26.551223014864693,
+      3.520874617450495,
+      -0.9739524956133009,
+      0.7521103598904594,
+      1.0841626685944823
+    ],
+    "temperature": [
+      49.035002370222045,
+      -14.189417017751234,
+      -0.9142917659742845,
+      0.09708278425198555,
+      3.2884988124326915,
+      0.18654850409386298
+    ],
+    "ph": [
+      6.7930196524629425,
+      0.12133556183443843,
+      -0.09709737298185925,
+      0.2557174419563382,
+      -0.16697853780107572,
+      -0.015875901320621354
+    ],
+    "olr": [
+      10.342702185308847,
+      -10.56999127623071,
+      4.534387437436741,
+      -6.749974089876468,
+      22.839455693025307,
+      -16.25796248724892
+    ],
+    "h2sBeforePpm": [
+      316.92916275118233,
+      66.16123783819191,
+      -14.93908136745523,
+      43.101180609146205,
+      -10.21439754664099,
+      -23.744987564492227
+    ],
+    "h2sAfterPpm": [
+      19.751771731459495,
+      7.87149512455594,
+      0.6093556754644284,
+      3.251628828206369,
+      -1.5847923253219143,
+      -2.2427874605412024
+    ],
+    "stabilityPct": [
+      83.12763291423502,
+      15.248488497635288,
+      -15.457637695618137,
+      22.65990506059866,
+      -8.744332219112653,
+      -4.6373242931498035
+    ]
+  },
+  "source": {
+    "file": "AQUAIVOLT_Hours-Scale_AI_Synthetic_500rows hrt hours.xlsx",
+    "sheet": "Hours-Scale AI Synthetic 500",
+    "sha256": "ceb1c5d4f3e87f51d283e54bbf03ebf67a236a4322e6660c698b2a87a88bb5ad",
+    "headerRow": 5,
+    "firstDataRow": 6,
+    "lastDataRow": 505
+  },
+  "fitRows": 500,
+  "researchOnly": true,
+  "validationStatus": "SYNTHETIC_ONLY_NOT_PLANT_VALIDATED",
+  "derived": {
+    "methaneM3Day": "biogasM3Day * methanePct / 100",
+    "electricityKwhDay": "methaneM3Day * 9.97 * 0.36"
+  },
+  "constants": {
+    "methaneEnergyKwhM3": 9.97,
+    "electricalEfficiency": 0.36
+  },
+  "evaluation": {
+    "displaySummary": {
+      "method": "Contiguous 100-row synthetic HRT holdout with 10-row gaps; candidate selection by five blocked development folds",
+      "trainRows": 380,
+      "testRows": 100,
+      "metricScope": "Agreement with withheld synthetic rows; not plant validation",
+      "targets": [
+        {
+          "key": "biogasM3Day",
+          "unit": "m3/day",
+          "mae": 0.4076381031730048,
+          "rmse": 0.5024327958316328,
+          "r2": 0.7961412679669158,
+          "baselineMae": 0.9993021052631592
+        },
+        {
+          "key": "methanePct",
+          "unit": "%",
+          "mae": 0.586904617757799,
+          "rmse": 0.6619972033745147,
+          "r2": 0.764552776605464,
+          "baselineMae": 2.937457894736823
+        },
+        {
+          "key": "feedRate",
+          "unit": "kg VS/day",
+          "mae": 2.206296612342859,
+          "rmse": 2.682852045636771,
+          "r2": 0.56136785782394,
+          "baselineMae": 3.4990000000001285
+        },
+        {
+          "key": "temperature",
+          "unit": "degC",
+          "mae": 0.6711016472148202,
+          "rmse": 0.707410283893192,
+          "r2": 0.8187929690583411,
+          "baselineMae": 1.4289526315789463
+        },
+        {
+          "key": "ph",
+          "unit": "pH",
+          "mae": 0.019134344087225107,
+          "rmse": 0.023560644736915323,
+          "r2": 0.12271200249840408,
+          "baselineMae": 0.07960526315789837
+        },
+        {
+          "key": "olr",
+          "unit": "kg VS/m3/day",
+          "mae": 0.28667730934467334,
+          "rmse": 0.33857670309443844,
+          "r2": 0.9465214115576464,
+          "baselineMae": 8.040010526315799
+        },
+        {
+          "key": "h2sBeforePpm",
+          "unit": "ppm",
+          "mae": 4.427394846874194,
+          "rmse": 4.935634650930085,
+          "r2": 0.5075435811644917,
+          "baselineMae": 8.077157894737061
+        },
+        {
+          "key": "h2sAfterPpm",
+          "unit": "ppm",
+          "mae": 0.5909718808864413,
+          "rmse": 0.6440116047974542,
+          "r2": 0.31542417671375933,
+          "baselineMae": 0.6491473684210536
+        },
+        {
+          "key": "stabilityPct",
+          "unit": "%",
+          "mae": 1.191602420082014,
+          "rmse": 1.2823071822574674,
+          "r2": 0.5316575869840898,
+          "baselineMae": 8.321689473684259
+        }
+      ],
+      "improvementPct": 71.51679418811729
+    },
+    "selectedCandidate": "Polynomial degree 5, ridge 0.1",
+    "selectionMetric": "Mean per-target MAE divided by each training fold target standard deviation, equally weighted across nine outputs",
+    "testIndicesZeroBased": [
+      200,
+      299
+    ],
+    "gapIndicesZeroBased": [
+      [
+        190,
+        199
+      ],
+      [
+        300,
+        309
+      ]
+    ],
+    "testHrtRangeHours": [
+      10.818,
+      15.182
+    ],
+    "testSourceIds": [
+      "RUN-H201",
+      "RUN-H202",
+      "RUN-H203",
+      "RUN-H204",
+      "RUN-H205",
+      "RUN-H206",
+      "RUN-H207",
+      "RUN-H208",
+      "RUN-H209",
+      "RUN-H210",
+      "RUN-H211",
+      "RUN-H212",
+      "RUN-H213",
+      "RUN-H214",
+      "RUN-H215",
+      "RUN-H216",
+      "RUN-H217",
+      "RUN-H218",
+      "RUN-H219",
+      "RUN-H220",
+      "RUN-H221",
+      "RUN-H222",
+      "RUN-H223",
+      "RUN-H224",
+      "RUN-H225",
+      "RUN-H226",
+      "RUN-H227",
+      "RUN-H228",
+      "RUN-H229",
+      "RUN-H230",
+      "RUN-H231",
+      "RUN-H232",
+      "RUN-H233",
+      "RUN-H234",
+      "RUN-H235",
+      "RUN-H236",
+      "RUN-H237",
+      "RUN-H238",
+      "RUN-H239",
+      "RUN-H240",
+      "RUN-H241",
+      "RUN-H242",
+      "RUN-H243",
+      "RUN-H244",
+      "RUN-H245",
+      "RUN-H246",
+      "RUN-H247",
+      "RUN-H248",
+      "RUN-H249",
+      "RUN-H250",
+      "RUN-H251",
+      "RUN-H252",
+      "RUN-H253",
+      "RUN-H254",
+      "RUN-H255",
+      "RUN-H256",
+      "RUN-H257",
+      "RUN-H258",
+      "RUN-H259",
+      "RUN-H260",
+      "RUN-H261",
+      "RUN-H262",
+      "RUN-H263",
+      "RUN-H264",
+      "RUN-H265",
+      "RUN-H266",
+      "RUN-H267",
+      "RUN-H268",
+      "RUN-H269",
+      "RUN-H270",
+      "RUN-H271",
+      "RUN-H272",
+      "RUN-H273",
+      "RUN-H274",
+      "RUN-H275",
+      "RUN-H276",
+      "RUN-H277",
+      "RUN-H278",
+      "RUN-H279",
+      "RUN-H280",
+      "RUN-H281",
+      "RUN-H282",
+      "RUN-H283",
+      "RUN-H284",
+      "RUN-H285",
+      "RUN-H286",
+      "RUN-H287",
+      "RUN-H288",
+      "RUN-H289",
+      "RUN-H290",
+      "RUN-H291",
+      "RUN-H292",
+      "RUN-H293",
+      "RUN-H294",
+      "RUN-H295",
+      "RUN-H296",
+      "RUN-H297",
+      "RUN-H298",
+      "RUN-H299",
+      "RUN-H300"
+    ],
+    "meanNormalizedMae": 0.07467411510374729,
+    "meanBaselineNormalizedMae": 0.2621689271809232,
+    "developmentRanking": [
+      {
+        "config": {
+          "name": "Polynomial degree 5, ridge 0.1",
+          "kind": "polynomial",
+          "degree": 5,
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.13175555145141185,
+        "foldScores": [
+          0.08724010663181853,
+          0.05482659321302446,
+          0.058444779760847436,
+          0.0665825322007454,
+          0.3916837454506234
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 4, ridge 0.1",
+          "kind": "polynomial",
+          "degree": 4,
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.1717468722269881,
+        "foldScores": [
+          0.21038604771027514,
+          0.05721749991891519,
+          0.06615440681833434,
+          0.06732591091145403,
+          0.45765049577596184
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 3 knots, ridge 0.001",
+          "kind": "linear_spline",
+          "knots": [
+            -0.5,
+            0.0,
+            0.5
+          ],
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.17467966278885952,
+        "foldScores": [
+          0.0879568255426949,
+          0.07558177490735048,
+          0.10709187253703674,
+          0.09069528658503373,
+          0.5120725543721818
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 3 knots, ridge 1e-05",
+          "kind": "linear_spline",
+          "knots": [
+            -0.5,
+            0.0,
+            0.5
+          ],
+          "alpha": 1e-05
+        },
+        "meanNormalizedMae": 0.17658666802072073,
+        "foldScores": [
+          0.08894027781382842,
+          0.07616065746241733,
+          0.12158975903470205,
+          0.09162442740385443,
+          0.5046182183888015
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 5, ridge 1.0",
+          "kind": "polynomial",
+          "degree": 5,
+          "alpha": 1.0
+        },
+        "meanNormalizedMae": 0.17953307757678702,
+        "foldScores": [
+          0.11360058319035009,
+          0.0677012984820747,
+          0.05696066745861777,
+          0.06748073719102567,
+          0.591922101561867
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 4, ridge 0.001",
+          "kind": "polynomial",
+          "degree": 4,
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.18319218751145994,
+        "foldScores": [
+          0.29421266893194264,
+          0.05768176063306588,
+          0.0768163817434689,
+          0.06896786920844382,
+          0.41828225704037836
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 9 knots, ridge 1e-05",
+          "kind": "linear_spline",
+          "knots": [
+            -0.8,
+            -0.6,
+            -0.3999999999999999,
+            -0.19999999999999996,
+            0.0,
+            0.20000000000000018,
+            0.40000000000000013,
+            0.6000000000000001,
+            0.8
+          ],
+          "alpha": 1e-05
+        },
+        "meanNormalizedMae": 0.1833819175195853,
+        "foldScores": [
+          0.10889905429211472,
+          0.06269426414414987,
+          0.055709901194667566,
+          0.05608121233667197,
+          0.6335251556303224
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 9 knots, ridge 0.001",
+          "kind": "linear_spline",
+          "knots": [
+            -0.8,
+            -0.6,
+            -0.3999999999999999,
+            -0.19999999999999996,
+            0.0,
+            0.20000000000000018,
+            0.40000000000000013,
+            0.6000000000000001,
+            0.8
+          ],
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.18538018149071553,
+        "foldScores": [
+          0.09917467484503031,
+          0.051542338092945894,
+          0.05555271270192498,
+          0.04903855775195157,
+          0.6715926240617249
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 4, ridge 1.0",
+          "kind": "polynomial",
+          "degree": 4,
+          "alpha": 1.0
+        },
+        "meanNormalizedMae": 0.19248871970664877,
+        "foldScores": [
+          0.13311286886148804,
+          0.06777977512185224,
+          0.05654409964090575,
+          0.0731946138065884,
+          0.6318122411024094
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 13 knots, ridge 0.001",
+          "kind": "linear_spline",
+          "knots": [
+            -0.8571428571428572,
+            -0.7142857142857143,
+            -0.5714285714285714,
+            -0.4285714285714286,
+            -0.2857142857142858,
+            -0.1428571428571429,
+            0.0,
+            0.1428571428571428,
+            0.2857142857142856,
+            0.4285714285714284,
+            0.5714285714285714,
+            0.7142857142857142,
+            0.857142857142857
+          ],
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.19643313884780844,
+        "foldScores": [
+          0.08160732309174107,
+          0.04678975356853668,
+          0.057979662529401836,
+          0.050696931544258826,
+          0.7450920235051037
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 13 knots, ridge 1e-05",
+          "kind": "linear_spline",
+          "knots": [
+            -0.8571428571428572,
+            -0.7142857142857143,
+            -0.5714285714285714,
+            -0.4285714285714286,
+            -0.2857142857142858,
+            -0.1428571428571429,
+            0.0,
+            0.1428571428571428,
+            0.2857142857142856,
+            0.4285714285714284,
+            0.5714285714285714,
+            0.7142857142857142,
+            0.857142857142857
+          ],
+          "alpha": 1e-05
+        },
+        "meanNormalizedMae": 0.197664997528298,
+        "foldScores": [
+          0.08483398009381042,
+          0.05761719341445248,
+          0.058237563019471486,
+          0.05307984114582603,
+          0.7345564099679296
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 3, ridge 0.001",
+          "kind": "polynomial",
+          "degree": 3,
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.19843378350797547,
+        "foldScores": [
+          0.2132447897609905,
+          0.07007913600937515,
+          0.08857275528065202,
+          0.08255906908645333,
+          0.5377131674024063
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 3, ridge 0.1",
+          "kind": "polynomial",
+          "degree": 3,
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.2016019347407263,
+        "foldScores": [
+          0.20284731955451882,
+          0.07109247956907702,
+          0.08692509325981283,
+          0.08318206719469287,
+          0.5639627141255299
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 3 knots, ridge 0.1",
+          "kind": "linear_spline",
+          "knots": [
+            -0.5,
+            0.0,
+            0.5
+          ],
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.23080105991840352,
+        "foldScores": [
+          0.06344760937354464,
+          0.05287090569033581,
+          0.06974764638374978,
+          0.08113246953294607,
+          0.8868066686114413
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 3, ridge 1.0",
+          "kind": "polynomial",
+          "degree": 3,
+          "alpha": 1.0
+        },
+        "meanNormalizedMae": 0.2309919419757976,
+        "foldScores": [
+          0.17680039969535427,
+          0.08506319964472112,
+          0.07502689900509173,
+          0.09203977739342295,
+          0.7260294341403977
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 5, ridge 0.001",
+          "kind": "polynomial",
+          "degree": 5,
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.2334984318856937,
+        "foldScores": [
+          0.5406219602016518,
+          0.05728073537318315,
+          0.06961890427929128,
+          0.06750742471330967,
+          0.4324631348610327
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 13 knots, ridge 0.1",
+          "kind": "linear_spline",
+          "knots": [
+            -0.8571428571428572,
+            -0.7142857142857143,
+            -0.5714285714285714,
+            -0.4285714285714286,
+            -0.2857142857142858,
+            -0.1428571428571429,
+            0.0,
+            0.1428571428571428,
+            0.2857142857142856,
+            0.4285714285714284,
+            0.5714285714285714,
+            0.7142857142857142,
+            0.857142857142857
+          ],
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.24241971724508674,
+        "foldScores": [
+          0.05959291826717142,
+          0.04727737451717144,
+          0.06523403830834056,
+          0.08735470168295238,
+          0.9526395534497978
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 5 knots, ridge 1e-05",
+          "kind": "linear_spline",
+          "knots": [
+            -0.6666666666666667,
+            -0.33333333333333337,
+            0.0,
+            0.33333333333333326,
+            0.6666666666666665
+          ],
+          "alpha": 1e-05
+        },
+        "meanNormalizedMae": 0.24497516066169966,
+        "foldScores": [
+          0.07659580981819819,
+          0.046481634918753234,
+          0.07009907257103784,
+          0.08198387421914126,
+          0.9497154117813678
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 5 knots, ridge 0.001",
+          "kind": "linear_spline",
+          "knots": [
+            -0.6666666666666667,
+            -0.33333333333333337,
+            0.0,
+            0.33333333333333326,
+            0.6666666666666665
+          ],
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.24557351378997208,
+        "foldScores": [
+          0.07737006143828147,
+          0.04655995465961091,
+          0.07038410869160112,
+          0.08201728660279087,
+          0.9515361575575761
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 9 knots, ridge 0.1",
+          "kind": "linear_spline",
+          "knots": [
+            -0.8,
+            -0.6,
+            -0.3999999999999999,
+            -0.19999999999999996,
+            0.0,
+            0.20000000000000018,
+            0.40000000000000013,
+            0.6000000000000001,
+            0.8
+          ],
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.25293071950014046,
+        "foldScores": [
+          0.06605094929355436,
+          0.04804225848232342,
+          0.0685173095064539,
+          0.1001476823018083,
+          0.9818953979165622
+        ]
+      },
+      {
+        "config": {
+          "name": "Linear spline 5 knots, ridge 0.1",
+          "kind": "linear_spline",
+          "knots": [
+            -0.6666666666666667,
+            -0.33333333333333337,
+            0.0,
+            0.33333333333333326,
+            0.6666666666666665
+          ],
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.27327471343173515,
+        "foldScores": [
+          0.08287461434494746,
+          0.0487137233535984,
+          0.08384135209414292,
+          0.12533548685990856,
+          1.0256083905060787
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 2, ridge 0.001",
+          "kind": "polynomial",
+          "degree": 2,
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.33503109743686776,
+        "foldScores": [
+          0.3676840505609861,
+          0.1350134252981955,
+          0.11645560666206428,
+          0.19048727857033756,
+          0.8655151260927553
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 2, ridge 0.1",
+          "kind": "polynomial",
+          "degree": 2,
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.3352753913340708,
+        "foldScores": [
+          0.36365920627410314,
+          0.1342378725342098,
+          0.11572106335791171,
+          0.19038589758787003,
+          0.8723729169162593
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 2, ridge 1.0",
+          "kind": "polynomial",
+          "degree": 2,
+          "alpha": 1.0
+        },
+        "meanNormalizedMae": 0.3387960122339835,
+        "foldScores": [
+          0.33160862435916927,
+          0.12784883776548864,
+          0.10992273752197369,
+          0.18957074729721743,
+          0.9350291142260683
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 1, ridge 1.0",
+          "kind": "polynomial",
+          "degree": 1,
+          "alpha": 1.0
+        },
+        "meanNormalizedMae": 0.4608458528379318,
+        "foldScores": [
+          0.3769649216412585,
+          0.08903973883577293,
+          0.2549877903215875,
+          0.29628876633672563,
+          1.2869480470543144
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 1, ridge 0.1",
+          "kind": "polynomial",
+          "degree": 1,
+          "alpha": 0.1
+        },
+        "meanNormalizedMae": 0.4609897640388333,
+        "foldScores": [
+          0.3959181522946923,
+          0.08465504365975543,
+          0.2549743756072468,
+          0.3014979061588305,
+          1.2679033424736414
+        ]
+      },
+      {
+        "config": {
+          "name": "Polynomial degree 1, ridge 0.001",
+          "kind": "polynomial",
+          "degree": 1,
+          "alpha": 0.001
+        },
+        "meanNormalizedMae": 0.4610166929976742,
+        "foldScores": [
+          0.3980331925055871,
+          0.08419828252415554,
+          0.2549734144666953,
+          0.3020896138167586,
+          1.2657889616751747
+        ]
+      },
+      {
+        "config": {
+          "name": "Mean baseline",
+          "kind": "mean",
+          "alpha": 0
+        },
+        "meanNormalizedMae": 1.4087626293002835,
+        "foldScores": [
+          1.5168781344355056,
+          1.099253976298487,
+          0.4228124229933183,
+          0.7814595392805571,
+          3.223409073493549
+        ]
+      }
+    ],
+    "limits": [
+      "Synthetic trajectory agreement only; not independent plant accuracy or demonstrated HRT reduction.",
+      "The 500 rows are an interpolated, noise-augmented expansion of ten source concepts, not 500 independent experiments.",
+      "HRT is the only independent model input. Process variables and outputs move together along the supplied research trajectory; independent input effects and feedstock-specific support are unknown.",
+      "The source has no feedstock column and no plant measurements. No sensor or equipment control is performed.",
+      "The source stability score is a synthetic scenario index, not calibrated uncertainty or a validated safety limit.",
+      "The model does not predict production at a baseline measured in weeks. A weeks-to-hours display compares a user baseline with a research target only.",
+      "The separate 0.5–5.95 hour extreme-extrapolation workbook is excluded. This model supports only its own 2–24 hour synthetic source.",
+      "Candidate selection used development folds only. The 100-row synthetic test block was excluded from fitting and tuning; final deployment fit uses all 500 rows after evaluation."
+    ],
+    "finalFitRows": 500
+  },
+  "limitations": [
+    "Synthetic trajectory agreement only; not independent plant accuracy or demonstrated HRT reduction.",
+    "The 500 rows are an interpolated, noise-augmented expansion of ten source concepts, not 500 independent experiments.",
+    "HRT is the only independent model input. Process variables and outputs move together along the supplied research trajectory; independent input effects and feedstock-specific support are unknown.",
+    "The source has no feedstock column and no plant measurements. No sensor or equipment control is performed.",
+    "The source stability score is a synthetic scenario index, not calibrated uncertainty or a validated safety limit.",
+    "The model does not predict production at a baseline measured in weeks. A weeks-to-hours display compares a user baseline with a research target only.",
+    "The separate 0.5–5.95 hour extreme-extrapolation workbook is excluded. This model supports only its own 2–24 hour synthetic source.",
+    "Candidate selection used development folds only. The 100-row synthetic test block was excluded from fitting and tuning; final deployment fit uses all 500 rows after evaluation."
+  ],
+  "parity": {
+    "cases": 2498,
+    "maxAbsoluteError": 2.2737367544323206e-13,
+    "tolerance": 1e-09,
+    "status": "PASS"
+  }
+}

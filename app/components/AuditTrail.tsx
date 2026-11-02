@@ -7,6 +7,7 @@ import type {executeRequest} from "../lib/execution";
 import type {manifest as manifestType} from "../lib/manifest";
 import type {SignedRecord} from "../lib/audit";
 import type {MlResult} from "../lib/ml-execution";
+import type {ResearchResult} from "../lib/hrt-research-execution";
 import MLPredictions from "./MLPredictions";
 import PlantValidation from "./PlantValidation";
 import DomainNotice from "./DomainNotice";
@@ -22,7 +23,7 @@ type RecordResult={record:SignedRecord;integrity:boolean};
 type Tab="ml"|"execution"|"model"|"comparison"|"records"|"validation";
 const labels:Record<Tab,string>={ml:"ML predictions",execution:"1. Scenario execution",model:"2. Scenario verification",comparison:"Scenario comparison",records:"Audit records",validation:"Plant validation"};
 
-export default function AuditTrail({onOverview}:{onOverview:()=>void}){
+export default function AuditTrail({onOverview,initialRunId=""}:{onOverview:()=>void;initialRunId?:string}){
   const [tab,setTab]=useState<Tab>("ml"),[setup,setSetup]=useState<Setup|null>(null);
   const [mlRun,setMlRun]=useState<MlResult|null>(null);
   const [validationRunId,setValidationRunId]=useState("");
@@ -47,6 +48,7 @@ export default function AuditTrail({onOverview}:{onOverview:()=>void}){
     finally{if(requestId===historyRequest.current)setRecordsLoading(false);}
   }
   useEffect(()=>{let active=true;void api<Setup>("/api/audit/tests").then(v=>{if(active)setSetup(v);}).catch(e=>{if(active)setError(message(e));});return()=>{active=false;};},[]);
+  useEffect(()=>{if(!initialRunId)return;let active=true;setTab("records");setQuery(initialRunId);void api<RecordResult>(`/api/audit?runId=${encodeURIComponent(initialRunId)}`).then(v=>{if(active)setOpened(v);}).catch(e=>{if(active)setError(message(e));});void history();return()=>{active=false;};},[initialRunId]);
   function edit(next:ModelInput){setInputs(next);setProfileId("CUSTOM");setRun(null);setReport(null);setHttp(null);setSent(null);setNegative(null);}
   async function execute(){
     setBusy("execution");setError("");setRun(null);setReport(null);setHttp(null);
@@ -144,8 +146,14 @@ export default function AuditTrail({onOverview}:{onOverview:()=>void}){
       <p className="at-muted" role="status">{rows.length} of {total} records loaded{snapshot?` / Snapshot ${new Date(snapshot).toLocaleString()}`:""}. Newest stored records first.</p>
       <div className="at-table-wrap"><table><caption>Stored records (global newest-first order)</caption><thead><tr><th>Run ID</th><th>Stored at</th><th>Executed at</th><th>Type</th><th>Operator</th><th>Version</th><th>Integrity</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><button className="at-link" disabled={Boolean(busy)} onClick={()=>void openRecord(r.id)}>{r.id}</button></td><td>{new Date(r.storedAt).toLocaleString()}</td><td>{new Date(r.createdAt).toLocaleString()}</td><td>{r.kind}</td><td>{r.username}</td><td>{r.modelVersion}</td><td><Status value={r.integrity?"PASS":"FAIL"}/>{r.readError&&<small className="at-subtext">Record could not be read; retry retrieval</small>}</td></tr>)}</tbody></table>{!rows.length&&!recordsError&&!recordsLoading&&<p className="at-empty">No stored records</p>}</div>
       {hasMore&&<button disabled={Boolean(busy)||recordsLoading} onClick={()=>void history(true)}>Load more records</button>}
-      {opened&&<div className="at-opened"><div className="at-heading"><h3>Retrieved evidence</h3><Status value={opened.integrity?"PASS":"FAIL"}/></div><code>{opened.record.id}</code><p className="at-muted">Server-authenticated export: SHA-256 and a server-held HMAC. Not a public-key signature or independent verification of plant measurements.</p><EvidenceLinks id={opened.record.id} scenarios={opened.record.kind==="optimization"&&opened.integrity}/>{opened.integrity&&opened.record.kind==="optimization"&&<button disabled={Boolean(busy)} onClick={loadRun}><ShieldCheck size={16}/>Select for test 2</button>}{opened.integrity&&opened.record.kind==="ml_prediction"&&<button disabled={Boolean(busy)} onClick={loadMlRun}><ShieldCheck size={16}/>Open ML prediction</button>}<Raw title="Full server-authenticated record" value={opened.record}/></div>}
+      {opened&&<div className="at-opened"><div className="at-heading"><h3>Retrieved evidence</h3><Status value={opened.integrity?"PASS":"FAIL"}/></div><code>{opened.record.id}</code><p className="at-muted">Server-authenticated export: SHA-256 and a server-held HMAC. Not a public-key signature or independent verification of plant measurements.</p><EvidenceLinks id={opened.record.id} scenarios={opened.record.kind==="optimization"&&opened.integrity}/>{opened.integrity&&opened.record.kind==="optimization"&&<button disabled={Boolean(busy)} onClick={loadRun}><ShieldCheck size={16}/>Select for test 2</button>}{opened.integrity&&opened.record.kind==="ml_prediction"&&<button disabled={Boolean(busy)} onClick={loadMlRun}><ShieldCheck size={16}/>Open ML prediction</button>}{opened.integrity&&opened.record.kind==="hrt_research"&&<ResearchAuditEvidence key={opened.record.id} result={opened.record.response as ResearchResult}/>}<Raw title="Full server-authenticated record" value={opened.record}/></div>}
     </section>}
-    <footer className="at-footer">Software test results are separate from model accuracy validation and auditor approval. HRT: days in the model, hours on the dashboard (x24).</footer>
+    <footer className="at-footer">Software test results are separate from plant accuracy validation and auditor approval. Day-scale models use days; the separate synthetic research model uses HRT in hours. Every record preserves its model and units.</footer>
   </div>;
+}
+
+function ResearchAuditEvidence({result}:{result:ResearchResult}){
+  const [report,setReport]=useState<{status:string;checks:{name:string;passed:boolean}[];meaning:string;saved:boolean}|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
+  async function verify(){setBusy(true);setError("");try{setReport(await api("/api/research/hrt/verify",{runId:result.runId}));}catch(e){setError(message(e));}finally{setBusy(false);}}
+  return <section className="hr-audit-summary"><h3>Hours-scale research evidence</h3><p><strong>{format(result.retentionTime.beforeHours/24)} days ({format(result.retentionTime.beforeHours)} h) → {format(result.retentionTime.optimizedHours)} hours</strong></p><p>HRT change: {hrtChangeLabel(result.retentionTime.beforeHours,result.retentionTime.optimizedHours)}. {result.baselineMeaning}</p><p>{result.disclosure}</p><p>Biogas {format(result.selected.biogasM3Day)} m³/day · Methane {format(result.selected.methaneM3Day)} m³ CH₄/day · Electricity {format(result.selected.electricityKwhDay)} kWh/day</p><p>Model {result.modelVersion} · {result.source.file}</p><div className="at-actions"><button disabled={busy} onClick={()=>void verify()}><ShieldCheck size={16}/>{busy?"Verifying…":"Verify HRT research replay"}</button><a href={`/api/research/hrt?runId=${result.runId}&format=csv`} download>Export research evaluations</a></div>{error&&<p role="alert">{error}</p>}{report&&<p><strong>{report.status}: {report.checks.filter(c=>c.passed).length}/{report.checks.length} checks.</strong> {report.meaning} {report.saved?"Verification saved.":"Verification not saved."}</p>}</section>;
 }

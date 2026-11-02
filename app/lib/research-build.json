@@ -1,0 +1,12 @@
+{
+  "sourceHash": "sha256:c4064611ae2cff38e0b88ac4551798bcc55ddb75eee0064e21e791a28f580302",
+  "files": {
+    "app/lib/hrt-research.ts": "d008ef7f92f041245304f8bd90b3cf79639826ada82fa127468663e8dcb1ce44",
+    "app/lib/hrt-research-execution.ts": "9907d7b7bb2a3e8c0004670f9da04cb13fd67ac1a4cc70b9b2455f785ce649df",
+    "app/lib/hrt.ts": "91ee63a65847368c942bb8ac7641a34ca15349223a9be2784f8ef49cfb579cc5",
+    "app/api/research/hrt/route.ts": "fbd3c72236f9d4798e04dd9ce6851e29a217e4c6ad513b0bf216dcdb18ca1d28",
+    "app/api/research/hrt/verify/route.ts": "86691487b4581c0f3f7ce0122a4a6825452ee20d8ad86b482de25df01eae287b",
+    "ai-workflow/research/hours-model.json": "8e803056525cecd5f2b41e410b7e3dc4fe09921b56b797e44f4d3b0cb6dc8833",
+    "ai-workflow/research/hours-data.json": "f759dd69a6ed9348181594c54cd88cc42cca6f62d0694a77048b911c995126c3"
+  }
+}

@@ -6,9 +6,11 @@ This repository contains the Aquaivolt biogas dashboard, its server-side predict
 
 **Live dashboard:** [aquaivolt-command-center.vercel.app](https://aquaivolt-command-center.vercel.app/)
 
+**2 November research workspace:** [HRT in hours and restored dashboard navigation](docs/HRT_RESEARCH_GUIDE.md). The separate hours-scale model fits the supplied synthetic trajectory, preserves its research status, and records actual backend runs. See the [current architecture](docs/ARCHITECTURE_2026-11-02.md) and [empirical model study](ai-workflow/research/MODEL_STUDY.md). Original day-scale model artifacts remain unchanged.
+
 **Client installation guide:** [Run the current dashboard locally](CLIENT_QUICK_START.md). Start here for Windows installation, local account setup, Audit Trail checks and troubleshooting.
 
-**Current audit instructions and architecture:** [Audit Trail 1.8.0](docs/AUDIT_TRAIL.md). Earlier diagrams and presentations describe historical versions and should not be treated as a current deployment manifest.
+**Original audit instructions:** [Audit Trail 1.8.0](docs/AUDIT_TRAIL.md). Earlier diagrams and presentations describe historical versions; use the 2 November architecture above for the added research path.
 
 For a searchable map of the current application and Python workflow, see [Graphify setup and queries](docs/GRAPHIFY.md). Run `pnpm graphify` to rebuild it. The [audit remediation checklist](docs/AUDIT_REMEDIATION_2026-10-31.md) describes the latest corrections and the remaining plant-validation prerequisites.
 
