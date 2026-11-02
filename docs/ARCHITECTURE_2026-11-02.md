@@ -1,16 +1,16 @@
 # Aquaivolt application architecture — 2 November 2026
 
-The active application is a Next.js 16 / React 19 dashboard deployed on Vercel using Node.js 24. The supplied video was used as the visual reference for the restored navy sidebar, teal navigation, workbook view, production cards, process workflow, optimisation and reports. The application now exposes three distinct calculation paths and retains the 31 October audit corrections.
+The active application is a Next.js 16 / React 19 dashboard deployed on Vercel using Node.js 24. The main navigation, production cards, AI recommendations, reports and Copilot use the hours-scale model. The original day-scale scenario and trained-model paths remain in Admin Audit Trail for evidence and validation preparation. The 31 October audit corrections remain in place.
 
 ```mermaid
 flowchart TD
   UI[Authenticated React dashboard] --> R[Hours-scale research workspace]
-  UI --> D[Day-scale reference workspace]
   UI --> A[Admin Audit Trail]
+  A --> D[Original day-scale scenario tests]
   R --> HR[POST /api/research/hrt]
   HR --> HM[Fitted polynomial trajectory model]
   HM --> C[2000 HRT evaluations and goal selection]
-  C --> S[Source-aware results and signed HRT change]
+  C --> S[Shared recommendations, production and signed HRT change]
   D --> P[POST /api/predict]
   P --> E[Reference scenario engine and seeded search]
   A --> ML[POST /api/ml/predict]
@@ -28,11 +28,13 @@ flowchart TD
 
 ## Frontend and reference video
 
-`app/page.tsx` owns authentication, the persistent navigation shell and the workspace choice. Hours-scale research opens first with an explicit research disclosure. The day-scale reference workspace remains available from the sidebar. The new research component stays mounted while navigating between production pages and Audit Trail, so the same completed run supplies every chart, card and export.
+`app/page.tsx` owns authentication and the persistent navigation shell. The duplicate day-scale operational dashboard has been removed from the main navigation. The research component stays mounted while navigating between production pages and Audit Trail, so the same completed run supplies every chart, recommendation, card and export.
 
 `app/components/HrtResearchWorkspace.tsx` provides Overview, Workbook AI reading, Biogas, Methane, Electricity, HRT in hours, Process monitor, AI optimizer, AI & KPI reports and Data sources. It reads actual backend results; it does not calculate replacement production figures in the browser. Changed settings mark the displayed result as stale until a new run finishes. Month/year totals are explicitly constant-output projections and do not change HRT. The process view reports completed backend stages without artificial progress delays.
 
-The HRT comparison deliberately separates a user-entered comparison time from a selected synthetic research scenario. A 22-day assumption is converted to 528 hours for arithmetic; the model independently evaluates its 2–24-hour research trajectory. It does not predict a measured weeks-scale baseline or claim a demonstrated reduction between two plant runs.
+The dashboard accepts comparison HRT in hours within 2–24 and defaults to 24 hours. The backend evaluates the comparison with the same fitted model, builds recommendation rows directly from the selected point, and saves both in the audit response and output fingerprint. The default selected HRT remains approximately 7.88 hours. These are two modelled scenarios, not measured before/after plant periods. Existing API requests containing a historical days-based comparison keep their actual conversion; comparison production is unavailable outside model coverage.
+
+`app/components/ResearchCopilot.tsx` sends the selected saved research run ID to `/api/copilot`. The server checks Admin access and record integrity, then answers from that saved hours-scale result. It does not combine old day-scale predictions or client-supplied output numbers with current recommendations.
 
 ## Calculation paths
 
@@ -80,7 +82,9 @@ Authentication remains the existing eight-hour HMAC-signed session cookie and se
 
 ## Supporting systems and remaining limits
 
-The original model-card, domain warnings, optimisation progress stream, batch reports and Copilot remain available in the day-scale workspace. The Python LangGraph workflow remains a technical proof, separate from the production TypeScript request paths. The existing plant-validation workflow stores declared measured observations against saved trained-ML runs and computes errors without automatically approving validation.
+Original model cards, domain warnings, scenario execution, verification and comparisons remain available in Audit Trail and the original API routes. The Python LangGraph workflow remains a technical proof, separate from the production TypeScript request paths. The existing plant-validation workflow stores declared measured observations against saved trained-ML runs and computes errors without automatically approving validation.
+
+The hours-scale fitted coefficients and source dataset are unchanged by the dashboard migration. Adding saved comparison points and recommendations changes the research engine fingerprint. Historical records remain downloadable without rewriting; their deterministic replay requires a matching engine build. Original day-scale model and trained-build fingerprints remain unchanged.
 
 No PLC, detector, actuator or equipment-control connection is implemented by this work. No measurement is manufactured. Independent plant accuracy, achievable hours-scale HRT, actual production improvements and calibrated uncertainty still require commissioning, suitable measured data and review.
 

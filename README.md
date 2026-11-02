@@ -6,7 +6,7 @@ This repository contains the Aquaivolt biogas dashboard, its server-side predict
 
 **Live dashboard:** [aquaivolt-command-center.vercel.app](https://aquaivolt-command-center.vercel.app/)
 
-**2 November research workspace:** [HRT in hours and restored dashboard navigation](docs/HRT_RESEARCH_GUIDE.md). The separate hours-scale model fits the supplied synthetic trajectory, preserves its research status, and records actual backend runs. See the [current architecture](docs/ARCHITECTURE_2026-11-02.md) and [empirical model study](ai-workflow/research/MODEL_STUDY.md). Original day-scale model artifacts remain unchanged.
+**Hours-scale dashboard:** [HRT, AI recommendations and production views](docs/HRT_RESEARCH_GUIDE.md) share one fitted 2–24-hour synthetic research model and one saved backend run. New comparisons default to 24 hours. Original day-scale model artifacts and tests remain in Audit Trail. See the [current architecture](docs/ARCHITECTURE_2026-11-02.md) and [empirical model study](ai-workflow/research/MODEL_STUDY.md).
 
 **Client installation guide:** [Run the current dashboard locally](CLIENT_QUICK_START.md). Start here for Windows installation, local account setup, Audit Trail checks and troubleshooting.
 
@@ -17,20 +17,22 @@ For a searchable map of the current application and Python workflow, see [Graphi
 ## What happens when the user calculates production?
 
 ```text
-Nine plant inputs
+Comparison HRT in hours + objective + methane-retention goal
       ↓
 Authentication and validation
       ↓
-Multi-input scenario inference
+Evaluate the fitted hours-scale model at 2,000 HRT points
       ↓
-Biogas, methane, electricity and carbon calculations
+Select the scenario and calculate biogas, methane and electricity potential
       ↓
-Setpoint search and recommendations
+Compare with the same model at the entered HRT; assemble recommendation rows
       ↓
-Charts, explanation and auditable execution ID
+Save evidence; share the result across charts, recommendations, reports and Copilot
 ```
 
-The dashboard considers:
+The hours-scale model uses HRT as its independent input. Temperature, pH, feed rate and loading vary together along the supplied synthetic trajectory. Independent plant performance has not been validated.
+
+The original day-scale models retained in Audit Trail accept:
 
 1. Feedstock type
 2. Feed rate
@@ -47,7 +49,8 @@ The dashboard considers:
 | Component | Location | Purpose |
 |---|---|---|
 | Deployed prediction API | [`app/api/predict/route.ts`](app/api/predict/route.ts) | Authenticated input contract and run persistence |
-| Overview scenario engine | [`app/lib/model.ts`](app/lib/model.ts) | Reference-anchor inference and 2,000-candidate seeded search |
+| Main dashboard and AI recommendations | [`app/lib/hrt-research.ts`](app/lib/hrt-research.ts) | Hours-scale inference, comparison and 2,000-point goal selection |
+| Original scenario engine (Audit Trail) | [`app/lib/model.ts`](app/lib/model.ts) | Preserved reference-anchor inference and seeded search |
 | Trained ML prediction API | [`app/api/ml/predict/route.ts`](app/api/ml/predict/route.ts) | Audit Trail: actual Ridge and Gradient Boosting predictions |
 | Trained ML runtime | [`app/lib/ml-runtime.ts`](app/lib/ml-runtime.ts) | Hash-checked ONNX CPU inference using the saved fitted pipelines |
 | Audit Trail | [`app/components/AuditTrail.tsx`](app/components/AuditTrail.tsx) | Execution, reproducibility, comparison and record retrieval |
@@ -81,7 +84,7 @@ START
 
 ### Important implementation statement
 
-- The **overview endpoint `/api/predict`** uses the server-side TypeScript scenario ensemble.
+- The **main dashboard endpoint `/api/research/hrt`** evaluates the hours-scale fitted model. The original `/api/predict` scenario endpoint remains available for Audit Trail tests and historical compatibility.
 - The **Audit Trail endpoint `/api/ml/predict`** executes both saved Gradient Boosting and Ridge pipelines, exported to ONNX, with the fitted encoders, scalers and learned weights intact. Conversion was checked against Python predictions on 674 cases per model. No retraining or reference-engine fallback is used.
 - The **LangGraph workflow** is an executable technical proof around saved scikit-learn models.
 - LangGraph orchestration itself is not called by either Vercel endpoint; the trained artifacts now execute directly in the Node API through ONNX Runtime.

@@ -1,6 +1,6 @@
 # AQUAIVOLT: local installation and user guide
 
-Updated 31 October 2026. These steps cover the current dashboard, Overview scenario engine, trained Gradient Boosting and Ridge models, and Admin Audit Trail.
+Updated 2 November 2026. These steps cover the hours-scale dashboard and AI recommendations, original Gradient Boosting and Ridge models, and Admin Audit Trail.
 
 ## 1. Download the current code
 
@@ -104,14 +104,14 @@ After completing steps 1-4, you can instead double-click `START_DASHBOARD.bat`. 
 ## 6. Sign in and run Overview optimization
 
 1. Sign in with username `admin` and your local Admin password.
-2. Confirm the baseline production values appear before running optimization.
-3. Select **Run AI optimization**.
-4. Wait for the eight-stage workflow to finish, then select **View results**.
-5. Inspect the baseline/selected-candidate comparison and proposed setpoints.
-6. Select **Export 2,000 scenarios** to download the evaluated candidate CSV.
+2. Confirm **Comparison HRT (hours)** is 24, or enter a comparison within 2–24 hours.
+3. Choose the study objective and methane-retention goal, then select **Run HRT study**.
+4. Wait for the backend result and saved audit status.
+5. Inspect the HRT change, AI recommendations and production estimates. Every value comes from the same hours-scale run.
+6. Select **Export 2,000 evaluations** to download the evaluated candidate CSV.
 7. Open Biogas, Methane and Electricity to inspect their production views.
 
-The 2,000 rows describe evaluated optimization candidates, not training data. The Overview uses the reference-based scenario engine. The separate trained model route is in Audit Trail.
+The 2,000 rows describe evaluated model points, not training data. Overview and AI recommendations use the fitted hours-scale research model. The original day-scale scenario engine and trained-model routes remain in Audit Trail; their original units are preserved.
 
 Signing in as `user` provides the production views but does not give access to Admin audit operations.
 

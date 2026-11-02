@@ -19,12 +19,13 @@ type Run=Awaited<ReturnType<typeof executeRequest>>;
 type Setup={manifest:typeof manifestType;manifestHash:string;storage:{available:boolean;provider:string};validation:{status:string;detail:string}};
 type Report=VerificationReport;
 type Row={id:string;createdAt:string;storedAt:string;kind:string;username:string;modelVersion:string;integrity:boolean;readError:boolean};
+type RecordPage={runs:Row[];cursor?:string;hasMore:boolean;total:number;snapshot:string};
 type RecordResult={record:SignedRecord;integrity:boolean};
 type Tab="ml"|"execution"|"model"|"comparison"|"records"|"validation";
 const labels:Record<Tab,string>={ml:"ML predictions",execution:"1. Scenario execution",model:"2. Scenario verification",comparison:"Scenario comparison",records:"Audit records",validation:"Plant validation"};
 
 export default function AuditTrail({onOverview,initialRunId=""}:{onOverview:()=>void;initialRunId?:string}){
-  const [tab,setTab]=useState<Tab>("ml"),[setup,setSetup]=useState<Setup|null>(null);
+  const [tab,setTab]=useState<Tab>(initialRunId?"records":"ml"),[setup,setSetup]=useState<Setup|null>(null);
   const [mlRun,setMlRun]=useState<MlResult|null>(null);
   const [validationRunId,setValidationRunId]=useState("");
   const [inputs,setInputs]=useState<ModelInput>({...profiles[0].inputs}),[profileId,setProfileId]=useState(profiles[0].id),[seed,setSeed]=useState("audit-test-001");
@@ -33,22 +34,32 @@ export default function AuditTrail({onOverview,initialRunId=""}:{onOverview:()=>
   const [negative,setNegative]=useState<{status:string;http:number;request:unknown;response:unknown}|null>(null);
   const [comparison,setComparison]=useState<Run[]>([]),[compareA,setCompareA]=useState(profiles[0].id),[compareB,setCompareB]=useState(profiles[1].id);
   const [rows,setRows]=useState<Row[]>([]),[cursor,setCursor]=useState<string|undefined>(),[hasMore,setHasMore]=useState(false),[recordsError,setRecordsError]=useState("");
-  const [query,setQuery]=useState(""),[opened,setOpened]=useState<RecordResult|null>(null);
-  const [recordsLoading,setRecordsLoading]=useState(false),[total,setTotal]=useState(0),[snapshot,setSnapshot]=useState("");
+  const [query,setQuery]=useState(initialRunId),[opened,setOpened]=useState<RecordResult|null>(null);
+  const [recordsLoading,setRecordsLoading]=useState(Boolean(initialRunId)),[total,setTotal]=useState(0),[snapshot,setSnapshot]=useState("");
   const historyRequest=useRef(0);
   async function history(more=false){
     if(more&&(recordsLoading||!cursor))return;
     const requestId=++historyRequest.current;
     setRecordsLoading(true);setRecordsError("");
     try{
-      const page=await api<{runs:Row[];cursor?:string;hasMore:boolean;total:number;snapshot:string}>(`/api/audit?limit=20${more&&cursor?`&cursor=${encodeURIComponent(cursor)}`:""}`);
+      const page=await api<RecordPage>(`/api/audit?limit=20${more&&cursor?`&cursor=${encodeURIComponent(cursor)}`:""}`);
       if(requestId!==historyRequest.current)return;
       setRows(old=>more?[...old,...page.runs.filter(r=>!old.some(o=>o.id===r.id))]:page.runs);setCursor(page.cursor);setHasMore(page.hasMore);setTotal(page.total);setSnapshot(page.snapshot);
     }catch(e){if(requestId===historyRequest.current)setRecordsError(message(e));}
     finally{if(requestId===historyRequest.current)setRecordsLoading(false);}
   }
   useEffect(()=>{let active=true;void api<Setup>("/api/audit/tests").then(v=>{if(active)setSetup(v);}).catch(e=>{if(active)setError(message(e));});return()=>{active=false;};},[]);
-  useEffect(()=>{if(!initialRunId)return;let active=true;setTab("records");setQuery(initialRunId);void api<RecordResult>(`/api/audit?runId=${encodeURIComponent(initialRunId)}`).then(v=>{if(active)setOpened(v);}).catch(e=>{if(active)setError(message(e));});void history();return()=>{active=false;};},[initialRunId]);
+  useEffect(()=>{
+    if(!initialRunId)return;
+    let active=true;const requestId=++historyRequest.current;
+    void api<RecordResult>(`/api/audit?runId=${encodeURIComponent(initialRunId)}`).then(value=>{if(active)setOpened(value);}).catch(e=>{if(active)setError(message(e));});
+    void api<RecordPage>("/api/audit?limit=20").then(page=>{
+      if(!active||requestId!==historyRequest.current)return;
+      setRows(page.runs);setCursor(page.cursor);setHasMore(page.hasMore);setTotal(page.total);setSnapshot(page.snapshot);
+    }).catch(e=>{if(active&&requestId===historyRequest.current)setRecordsError(message(e));})
+      .finally(()=>{if(active&&requestId===historyRequest.current)setRecordsLoading(false);});
+    return()=>{active=false;};
+  },[initialRunId]);
   function edit(next:ModelInput){setInputs(next);setProfileId("CUSTOM");setRun(null);setReport(null);setHttp(null);setSent(null);setNegative(null);}
   async function execute(){
     setBusy("execution");setError("");setRun(null);setReport(null);setHttp(null);
@@ -95,7 +106,8 @@ export default function AuditTrail({onOverview,initialRunId=""}:{onOverview:()=>
   const trainedView=tab==="ml"||tab==="validation";
   return <div className="at-workspace">
     <header className="at-header"><div><button className="at-back" onClick={onOverview}><ArrowLeft size={16}/>Overview</button><h1><ClipboardCheck size={25}/>Audit Trail</h1><p>AQUAIVOLT / Execution evidence</p></div><div className="at-actions"><button title="Print audit evidence or save as PDF" onClick={()=>window.print()}><Printer size={17}/>Print evidence</button></div></header>
-    <div className="at-meta"><div><span>{trainedView?"Audit ML models":"Overview scenario engine"}</span><strong>{trainedView?"Gradient Boosting + Ridge Regression":setup?.manifest.model.name??"Loading model"}</strong><small>{trainedView?"Saved fitted pipelines / trained-ml-1.0.0":`Version ${setup?.manifest.model.version??"..."}`}</small></div><div><span>Persistent storage</span><Status value={setup?(setup.storage.available?"AVAILABLE":"UNAVAILABLE"):"CHECKING"}/><small>{setup?.storage.provider??"Checking connection"}</small></div><div><span>Plant validation</span><Status value="NOT VALIDATED"/><small>Advisory prototype; no equipment control</small></div></div>
+    <p className="at-notice">The main dashboard and AI recommendations use the hours-scale model. Original day-scale model tests remain here for audit comparison and plant-validation preparation; their inputs and historical records retain their original units.</p>
+    <div className="at-meta"><div><span>{trainedView?"Original audit ML models":"Original day-scale scenario engine"}</span><strong>{trainedView?"Gradient Boosting + Ridge Regression":setup?.manifest.model.name??"Loading model"}</strong><small>{trainedView?"Saved fitted pipelines / trained-ml-1.0.0":`Version ${setup?.manifest.model.version??"..."}`}</small></div><div><span>Persistent storage</span><Status value={setup?(setup.storage.available?"AVAILABLE":"UNAVAILABLE"):"CHECKING"}/><small>{setup?.storage.provider??"Checking connection"}</small></div><div><span>Plant validation</span><Status value="NOT VALIDATED"/><small>Advisory prototype; no equipment control</small></div></div>
     <nav className="at-tabs" aria-label="Audit sections">{(Object.keys(labels) as Tab[]).map(key=><button key={key} aria-current={tab===key?"page":undefined} onClick={()=>{setTab(key);setError("");if(key==="records")void history();}}>{labels[key]}</button>)}</nav>
     {error&&<div className="at-error" role="alert">{error}</div>}
     <div hidden={tab!=="ml"}><MLPredictions key={mlRun?.runId??"new"} selected={mlRun} onRecorded={setValidationRunId}/></div>
@@ -155,5 +167,5 @@ export default function AuditTrail({onOverview,initialRunId=""}:{onOverview:()=>
 function ResearchAuditEvidence({result}:{result:ResearchResult}){
   const [report,setReport]=useState<{status:string;checks:{name:string;passed:boolean}[];meaning:string;saved:boolean}|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
   async function verify(){setBusy(true);setError("");try{setReport(await api("/api/research/hrt/verify",{runId:result.runId}));}catch(e){setError(message(e));}finally{setBusy(false);}}
-  return <section className="hr-audit-summary"><h3>Hours-scale research evidence</h3><p><strong>{format(result.retentionTime.beforeHours/24)} days ({format(result.retentionTime.beforeHours)} h) → {format(result.retentionTime.optimizedHours)} hours</strong></p><p>HRT change: {hrtChangeLabel(result.retentionTime.beforeHours,result.retentionTime.optimizedHours)}. {result.baselineMeaning}</p><p>{result.disclosure}</p><p>Biogas {format(result.selected.biogasM3Day)} m³/day · Methane {format(result.selected.methaneM3Day)} m³ CH₄/day · Electricity {format(result.selected.electricityKwhDay)} kWh/day</p><p>Model {result.modelVersion} · {result.source.file}</p><div className="at-actions"><button disabled={busy} onClick={()=>void verify()}><ShieldCheck size={16}/>{busy?"Verifying…":"Verify HRT research replay"}</button><a href={`/api/research/hrt?runId=${result.runId}&format=csv`} download>Export research evaluations</a></div>{error&&<p role="alert">{error}</p>}{report&&<p><strong>{report.status}: {report.checks.filter(c=>c.passed).length}/{report.checks.length} checks.</strong> {report.meaning} {report.saved?"Verification saved.":"Verification not saved."}</p>}</section>;
+  return <section className="hr-audit-summary"><h3>Hours-scale research evidence</h3><p><strong>{format(result.retentionTime.beforeHours)} hours → {format(result.retentionTime.optimizedHours)} hours</strong></p><p>HRT change: {hrtChangeLabel(result.retentionTime.beforeHours,result.retentionTime.optimizedHours)}. {result.baselineMeaning}</p><p>{result.disclosure}</p><p>Biogas {format(result.selected.biogasM3Day)} m³/day · Methane {format(result.selected.methaneM3Day)} m³ CH₄/day · Electricity {format(result.selected.electricityKwhDay)} kWh/day</p><p>Model {result.modelVersion} · {result.source.file}</p><div className="at-actions"><button disabled={busy} onClick={()=>void verify()}><ShieldCheck size={16}/>{busy?"Verifying…":"Verify HRT research replay"}</button><a href={`/api/research/hrt?runId=${result.runId}&format=csv`} download>Export research evaluations</a></div>{error&&<p role="alert">{error}</p>}{report&&<p><strong>{report.status}: {report.checks.filter(c=>c.passed).length}/{report.checks.length} checks.</strong> {report.meaning} {report.saved?"Verification saved.":"Verification not saved."}</p>}</section>;
 }

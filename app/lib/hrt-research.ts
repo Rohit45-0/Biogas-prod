@@ -15,7 +15,7 @@ export const researchRows=(dataFile as unknown as {rows:ResearchRow[]}).rows;
 export const researchArtifactHash=fingerprint(modelFile);
 export const researchDataHash=fingerprint(dataFile);
 export const researchManifestHash=fingerprint({artifactHash:researchArtifactHash,dataHash:researchDataHash,sourceHash:researchBuild.sourceHash});
-export const researchDefaults:ResearchRequest={baseline:{value:22,unit:"days"},objective:"shortest_hrt",retainedMethanePct:90,targetHours:12};
+export const researchDefaults:ResearchRequest={baseline:{value:24,unit:"hours"},objective:"shortest_hrt",retainedMethanePct:90,targetHours:12};
 export const researchDisclosure="Synthetic workbook research scenario. Hours-scale operation and plant improvement have not been demonstrated. No equipment is controlled.";
 
 export function resolveResearchRequest(value:unknown):ResearchRequest{
@@ -61,21 +61,33 @@ export function calculateResearch(body:unknown){
   const selected=request.objective==="target_hrt"?predictResearch(request.targetHours):request.objective==="maximum_energy"?peak:feasible[0];
   if(!selected)throw new Error("No feasible research point found");
   const beforeHours=request.baseline.value*(request.baseline.unit==="days"?24:1);
+  const comparison=beforeHours>=min&&beforeHours<=max?predictResearch(beforeHours):null;
   const retentionTime={beforeHours,optimizedHours:selected.hrtHours,...hrtChange(beforeHours,selected.hrtHours),changePct:(selected.hrtHours/beforeHours-1)*100};
+  const recommendationFields=[
+    {key:"hrtHours",label:"HRT",unit:"hours"},
+    {key:"temperature",label:"Temperature",unit:"°C"},
+    {key:"ph",label:"pH",unit:"pH"},
+    {key:"feedRate",label:"Feed rate",unit:"kg VS/day"},
+    {key:"olr",label:"Organic loading",unit:"kg VS/m³/day"},
+  ] as const;
+  const recommendations=recommendationFields.map(field=>{
+    const current=field.key==="hrtHours"?beforeHours:comparison?.[field.key]??null,target=selected[field.key];
+    return {...field,current,target,change:current===null?null:target-current};
+  });
   const goal={retainedMethanePct:request.retainedMethanePct,peakMethaneM3Day:peak.methaneM3Day,minimumMethaneM3Day:minimumMethane,selectedRetainedPct:selected.methaneM3Day/peak.methaneM3Day*100,satisfied:selected.methaneM3Day+1e-10>=minimumMethane,feasibleCount:feasible.length};
   const ranked=[...candidates].sort(request.objective==="maximum_energy"?(a,b)=>b.electricityKwhDay-a.electricityKwhDay:(a,b)=>Math.abs(a.hrtHours-selected.hrtHours)-Math.abs(b.hrtHours-selected.hrtHours));
   const curve=Array.from({length:45},(_,i)=>predictResearch(min+(max-min)*i/44));
-  return {request,retentionTime,selected,goal,peak,curve,candidatePreview:ranked.slice(0,8),candidates,candidateCount:candidates.length,
+  return {request,retentionTime,comparison,recommendations,selected,goal,peak,curve,candidatePreview:ranked.slice(0,8),candidates,candidateCount:candidates.length,
     modelVersion:researchModel.version,artifactHash:researchArtifactHash,dataHash:researchDataHash,manifestHash:researchManifestHash,engineHash:researchBuild.sourceHash,source:researchModel.source,
     mode:"HOURS_RESEARCH" as const,validationStatus:"SYNTHETIC AGREEMENT ONLY" as const,disclosure:researchDisclosure,
-    baselineMeaning:"User-entered comparison time; no measured before/after plant pair is implied.",
+    baselineMeaning:comparison?"Entered comparison HRT evaluated by the same hours-scale model; both scenarios are estimates, not measured plant results.":"User-entered comparison time outside the hours-scale model. No baseline production or measured before/after plant pair is implied.",
     trajectoryMeaning:"HRT selects a jointly varying synthetic process trajectory. These data do not identify independent effects of temperature, pH, feed rate or loading.",
     uncertainty:{status:"NOT_CALIBRATED",predictionInterval:null},
     candidateMeaning:"2,000 model evaluations, not 2,000 independent training records.",
     energyAssumptions:{methaneKwhPerM3:9.97,electricalEfficiency:.36,source:"Original workbook Assumptions & Audit; theoretical electricity potential"}};
 }
 export type ResearchCalculation=ReturnType<typeof calculateResearch>;
-export function researchOutputHash(result:ResearchCalculation){return fingerprint({request:result.request,selected:result.selected,retentionTime:result.retentionTime,goal:result.goal,curve:result.curve,candidates:result.candidates,artifactHash:result.artifactHash,dataHash:result.dataHash,manifestHash:result.manifestHash});}
+export function researchOutputHash(result:ResearchCalculation){return fingerprint({request:result.request,selected:result.selected,retentionTime:result.retentionTime,comparison:result.comparison,recommendations:result.recommendations,goal:result.goal,curve:result.curve,candidates:result.candidates,artifactHash:result.artifactHash,dataHash:result.dataHash,manifestHash:result.manifestHash});}
 
 export function researchMetadata(){return {name:"Hours-scale trajectory model",version:researchModel.version,artifactHash:researchArtifactHash,dataHash:researchDataHash,manifestHash:researchManifestHash,
   input:researchModel.input,fitRows:researchModel.fitRows,source:researchModel.source,defaults:researchDefaults,

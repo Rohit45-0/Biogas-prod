@@ -1,15 +1,17 @@
 # HRT research workspace
 
-Sign in as Admin and choose **Hours-scale research**. The navy-and-teal navigation follows the supplied application video. The original dashboard and models remain accessible through **Day-scale reference** and **Audit Trail**.
+Sign in as Admin. Overview, Biogas, Methane, Electricity, HRT, AI optimizer and reports all use the **hours-scale model**, including AI recommendations. The original day-scale scenario and trained-model tests remain in **Audit Trail** for evidence and plant-validation preparation; they no longer supply the main dashboard.
 
-1. Enter the comparison HRT and its unit, such as 22 days. This is your comparison assumption, not a measured baseline imported by the application.
+1. Enter **Comparison HRT (hours)** within 2–24 hours. New studies default to **24 hours**, an hours-scale comparison scenario, not a conversion of the historical 22-day baseline. The backend evaluates its production and process conditions using the same fitted model as the selected scenario.
 2. Choose **Shortest HRT**, **Maximum electricity**, or **Specific HRT**. The research model supports 2–24 hours.
 3. Set the methane-retention goal. The default 90% means retaining 90% of the highest predicted methane output along the synthetic trajectory. It is not a safety limit.
 4. Select **Run HRT study**. The backend evaluates the fitted model and stores a server-authenticated audit record.
-5. Review HRT, biogas, methane and electricity together. The shortest HRT can reduce methane quality and electricity potential despite increasing total gas volume.
+5. Review **AI recommendations**, HRT, biogas, methane and electricity together. Recommendation rows come from the backend's saved selected scenario. The shortest HRT can reduce methane quality and electricity potential despite increasing total gas volume. HRT increases, decreases and unchanged values retain explicit signed labels; selecting a lower HRT does not automatically establish an improvement.
 6. Use **AI & KPI reports** to export all 2,000 evaluated points, download the original audit JSON, verify replay, or open the record in **Audit Trail**.
 
-For the default 22-day comparison and 90% methane goal, version `hours-research-1.0.0` selects approximately **7.88 hours**, **79.81 m³/day biogas**, **38.04 m³ CH₄/day** and **136.54 kWh/day theoretical electricity**. This is a synthetic research result. It does not demonstrate that a commissioned plant can achieve that retention time or improvement.
+For the default 24-hour comparison and 90% methane goal, version `hours-research-1.0.0` selects approximately **7.88 hours**, **79.81 m³/day biogas**, **38.04 m³ CH₄/day** and **136.54 kWh/day theoretical electricity**. The HRT change is approximately **−16.12 hours**. These are synthetic research estimates; actual plant performance remains to be validated.
+
+The same completed run supplies recommendations on every production page and the exported audit record. Editing the settings marks the existing result as stale until a new study finishes. **Ask Copilot** reads the selected saved research record and explains its hours-scale results. It does not use the old day-scale recommendations.
 
 ## What the accuracy results mean
 
@@ -29,6 +31,6 @@ Research evaluations are generated model points, not additional training data. C
 
 ## Preserving the auditor's evidence
 
-The 31 October software corrections remain present: newest-first audit listing and pagination, neutral signed HRT change, server-authentication wording, explicit domain/uncertainty warnings, and the measured-plant validation workflow. Historical records and original model files are not overwritten. New research records carry their own model and engine identifiers.
+The 31 October software corrections remain present: newest-first audit listing and pagination, neutral signed HRT change, server-authentication wording, explicit domain/uncertainty warnings, and the measured-plant validation workflow. Historical records and original model files are not overwritten. Historical day-based inputs retain their actual units, and old research API requests using a days-based comparison remain explicit. No baseline production is fabricated outside the research model's 2–24-hour range. New research records include the comparison-model point and recommendation rows, so the engine fingerprint changes while the fitted model artifact stays unchanged. Old-build records remain exportable; replay requires their matching engine build.
 
 Measured plant validation and demonstrated before/after production improvements remain dependent on equipment arrival, commissioning and appropriate data collection. The research interface cannot establish those outcomes by changing display units or choosing a target.

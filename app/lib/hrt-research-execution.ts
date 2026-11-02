@@ -8,7 +8,7 @@ export async function executeResearch(body:unknown,session:AquaSession){
   const calculated=calculateResearch(body);
   const response={...calculated,runId,createdAt,outputHash:researchOutputHash(calculated),
     elapsedMs:Number((performance.now()-started).toFixed(3)),
-    trace:["Validate explicit units and research bounds","Evaluate the fitted synthetic trajectory","Search 2,000 points against the requested goal","Calculate signed HRT change and energy potential","Fingerprint model, data, request and outputs"],
+    trace:["Validate explicit units and research bounds","Evaluate the fitted synthetic trajectory","Search 2,000 points against the requested goal","Calculate comparison, recommendations, signed HRT change and energy potential","Fingerprint model, data, request and outputs"],
     deployment:process.env.VERCEL_DEPLOYMENT_ID??process.env.VERCEL_URL??"local-development"};
   try{
     const record=await storeEvidence({id:runId,createdAt,username:session.username,role:session.role,kind:"hrt_research",request:body,inputs:calculated.request,response,

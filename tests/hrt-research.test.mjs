@@ -51,6 +51,30 @@ test("hours research uses a fitted model, explicit units and durable evidence",{
     const low=(await call("/api/research/hrt",{...request,objective:"target_hrt",targetHours:2})).data;assert.equal(low.selected.hrtHours,2);assert.equal(low.goal.satisfied,false);assert.ok(low.selected.methaneM3Day<run.selected.methaneM3Day);
     const replay=(await call("/api/research/hrt",request)).data;assert.notEqual(replay.runId,run.runId);assert.equal(replay.outputHash,run.outputHash);
   });
+  await t.test("hours dashboard recommendations, comparison and Copilot share the saved model result",async()=>{
+    const meta=(await call("/api/research/hrt")).data;
+    assert.deepEqual(meta.defaults.baseline,{value:24,unit:"hours"});
+    const current=(await call("/api/research/hrt",meta.defaults)).data;
+    assert.equal(current.retentionTime.beforeHours,24);assert.equal(current.comparison.hrtHours,24);
+    assert.ok(current.selected.hrtHours>=2&&current.selected.hrtHours<=24);
+    for(const item of current.recommendations){
+      assert.equal(item.target,current.selected[item.key]);assert.equal(item.current,current.comparison[item.key]);
+      assert.equal(item.change,item.target-item.current);
+    }
+    const hrt=current.recommendations.find(item=>item.key==="hrtHours");assert.equal(hrt.unit,"hours");assert.equal(hrt.current,24);
+    const baseline=(await call("/api/research/hrt",{...meta.defaults,objective:"target_hrt",targetHours:24})).data;
+    assert.deepEqual(current.comparison,baseline.selected);
+    const restored=(await call(`/api/research/hrt?runId=${current.runId}`)).data;assert.deepEqual(restored.recommendations,current.recommendations);
+    const verified=await call("/api/research/hrt/verify",{runId:current.runId});assert.equal(verified.data.status,"PASS");
+    const copilot=await call("/api/copilot",{question:"Why this HRT?",mode:"HOURS_RESEARCH",researchRunId:current.runId,prediction:{bestSetpoints:{hrt:602}}});
+    assert.equal(copilot.status,200);assert.equal(copilot.data.runId,current.runId);
+    assert.ok(copilot.data.answer.includes(`${current.selected.hrtHours.toFixed(2)} hours`));assert.doesNotMatch(copilot.data.answer,/602|days/);
+    assert.equal((await call("/api/copilot",{question:"HRT?",mode:"HOURS_RESEARCH",researchRunId:current.runId},userCookie)).status,403);
+    assert.equal((await call("/api/copilot",{question:"HRT?",mode:"HOURS_RESEARCH",researchRunId:"invalid"})).status,400);
+    // A historical day-based comparison remains explicit and never becomes a fake hours baseline.
+    assert.equal(run.retentionTime.beforeHours,528);assert.equal(run.comparison,null);
+    assert.equal(run.recommendations.find(item=>item.key==="temperature").current,null);
+  });
   await t.test("saved evidence, replay, CSV and fresh-session listing agree",async()=>{
     const saved=(await call(`/api/audit?runId=${run.runId}`)).data;assert.equal(saved.integrity,true);assert.equal(saved.record.kind,"hrt_research");assert.equal(saved.record.response.outputHash,run.outputHash);
     const verified=await call("/api/research/hrt/verify",{runId:run.runId});assert.equal(verified.status,200);assert.equal(verified.data.status,"PASS");assert.equal(verified.data.saved,true);assert.equal(verified.data.checks.length,8);
@@ -64,6 +88,7 @@ test("hours research uses a fitted model, explicit units and durable evidence",{
     const file=path.join(storage,"audit-v2/records",run.runId+".json"),record=JSON.parse(await readFile(file,"utf8"));record.response.selected.hrtHours=.5;await writeFile(file,JSON.stringify(record));
     assert.equal((await call(`/api/research/hrt?runId=${run.runId}`)).status,409);
     assert.equal((await call("/api/research/hrt/verify",{runId:run.runId})).status,409);
+    assert.equal((await call("/api/copilot",{question:"HRT?",mode:"HOURS_RESEARCH",researchRunId:run.runId})).status,409);
     const csv=await fetch(base+`/api/research/hrt?runId=${run.runId}&format=csv`,{headers:{Cookie:cookie}});assert.equal(csv.status,409);
   });
 });
