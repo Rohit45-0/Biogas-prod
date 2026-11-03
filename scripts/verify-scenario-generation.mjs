@@ -11,6 +11,14 @@ const build=JSON.parse(await readFile("app/lib/research-build.json","utf8"));
 const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHANNEL?{channel:process.env.PLAYWRIGHT_CHANNEL}:{})});
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1100}});
+  if(process.env.AUDIT_ACCESS_COOKIE_JAR){
+    const jar=await readFile(process.env.AUDIT_ACCESS_COOKIE_JAR,"utf8");
+    const cookies=jar.split(/\r?\n/).filter(line=>line.startsWith("#HttpOnly_")||line&&!line.startsWith("#")).map(line=>{
+      const [domain,,cookiePath,secure,expires,name,value]=line.replace(/^#HttpOnly_/,"").split("\t");
+      return {domain,path:cookiePath,secure:secure==="TRUE",expires:Number(expires)||-1,name,value,httpOnly:line.startsWith("#HttpOnly_")};
+    });
+    await context.addCookies(cookies);
+  }
   const login=await context.request.post(base+"/api/auth/login",{data:{username:process.env.AQUA_ADMIN_USERNAME||"admin",password}});
   assert.equal(login.status(),200,"Admin login failed");
   const page=await context.newPage(),errors=[];
