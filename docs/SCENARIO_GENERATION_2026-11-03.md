@@ -1,0 +1,11 @@
+# New scenario on each run
+
+The hours dashboard previously submitted the same settings and displayed only the globally optimized scenario. Changing the comparison HRT changed the comparison prediction, but the same objective still selected the same 7.88-hour optimum. Repeating that optimum was expected; the application was not generating new operating inputs.
+
+The dashboard now defaults to **New scenario on each run**. The backend generates a new synthetic HRT input on the supported 2–24 hour trajectory, in 0.1-hour steps and at least one hour away from the preceding scenario supplied by the dashboard. The fitted model calculates biogas, methane, electricity potential and corresponding process conditions from that HRT. No random adjustment is added to predictions. The current model has HRT as its only independent input; temperature, pH, feed rate and loading are jointly varying trajectory outputs, not separately validated causal inputs.
+
+Current-scenario production is displayed separately from the AI selected recommendation. The recommendation still searches all 2,000 candidate points against the chosen objective. The same goal may therefore return the same optimum. Manual comparison mode remains available and identical inputs reproduce identical predictions.
+
+The API accepts an optional `scenario` object with `mode: "automatic"`, optional `previousHrtHours` within coverage, and an optional 8–64 character replay `seed`. Without a seed, execution assigns a new run UUID as the seed. The original request and resolved inputs (including the seed) are saved separately in the server-authenticated audit record. Replay uses the resolved inputs; exports include the generated scenario HRT, mode and seed. Historical requests without `scenario` retain manual semantics. Historical evidence remains retrievable; replay against a different engine build is explicitly rejected.
+
+Verification covers repeated automatic runs, independently evaluating each generated HRT through the fitted-model path, saved-seed replay, strict input validation, original manual behavior, audit integrity, and browser checks that repeated clicks display the current scenario's production. Existing source data and fitted coefficients are unchanged. These checks establish software behavior, not measured plant accuracy or improvement.

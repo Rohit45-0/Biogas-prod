@@ -84,6 +84,40 @@ test("hours research uses a fitted model, explicit units and durable evidence",{
     const listed=(await call("/api/audit?limit=50")).data;assert.ok(listed.runs.some(r=>r.id===run.runId&&r.integrity));
     const fetched=(await call(`/api/research/hrt?runId=${run.runId}`)).data;assert.deepEqual(fetched.selected,run.selected);
   });
+  await t.test("automatic runs change supported inputs, calculate predictions and replay saved seeds",async()=>{
+    const defaults=(await call("/api/research/hrt")).data.defaults;
+    for(const scenario of [null,[],{}, {mode:"manual"},{mode:"automatic",seed:"short"},{mode:"automatic",seed:22},{mode:"automatic",previousHrtHours:1.9},{mode:"automatic",previousHrtHours:24.1},{mode:"automatic",previousHrtHours:"12"},{mode:"automatic",noise:true}]){
+      assert.equal((await call("/api/research/hrt",{...defaults,scenario})).status,422,JSON.stringify(scenario));
+    }
+    let previous=24,previousPrediction;
+    for(let i=0;i<10;i++){
+      const submitted={...defaults,scenario:{mode:"automatic",previousHrtHours:previous}};
+      const response=await call("/api/research/hrt",submitted);assert.equal(response.status,200);
+      const current=response.data;
+      assert.equal(current.scenario.mode,"automatic");assert.ok(current.scenario.seed);
+      assert.ok(current.scenario.hrtHours>=2&&current.scenario.hrtHours<=24);
+      assert.ok(Math.abs(current.scenario.hrtHours-previous)>=1-1e-10);
+      assert.equal(current.retentionTime.beforeHours,current.scenario.hrtHours);
+      assert.equal(current.comparison.hrtHours,current.scenario.hrtHours);
+      // A generated input must use the actual fitted prediction, without output jitter.
+      const manual=(await call("/api/research/hrt",{...defaults,objective:"target_hrt",targetHours:current.scenario.hrtHours})).data;
+      assert.deepEqual(current.comparison,manual.selected);
+      assert.deepEqual(current.selected,run.selected,"Unchanged optimization goals keep the same global optimum");
+      if(previousPrediction)assert.notDeepEqual(current.comparison,previousPrediction);
+      for(const item of current.recommendations)assert.equal(item.current,current.comparison[item.key]);
+      const evidence=(await call(`/api/audit?runId=${current.runId}`)).data;
+      assert.equal(evidence.integrity,true);assert.deepEqual(evidence.record.request,submitted);
+      assert.equal(evidence.record.inputs.scenario.seed,current.scenario.seed);
+      const replay=(await call("/api/research/hrt",current.request)).data;
+      assert.notEqual(replay.runId,current.runId);assert.equal(replay.outputHash,current.outputHash);
+      assert.deepEqual(replay.comparison,current.comparison);
+      assert.equal((await call("/api/research/hrt/verify",{runId:current.runId})).data.status,"PASS");
+      const copilot=(await call("/api/copilot",{question:"Why the same recommendation on each run?",mode:"HOURS_RESEARCH",researchRunId:current.runId})).data;
+      assert.match(copilot.answer,/same optimization goal can return the same optimum/);
+      assert.ok(copilot.answer.includes(current.comparison.biogasM3Day.toFixed(2)));
+      previous=current.scenario.hrtHours;previousPrediction=current.comparison;
+    }
+  });
   await t.test("tampered research records cannot be exported or replayed",async()=>{
     const file=path.join(storage,"audit-v2/records",run.runId+".json"),record=JSON.parse(await readFile(file,"utf8"));record.response.selected.hrtHours=.5;await writeFile(file,JSON.stringify(record));
     assert.equal((await call(`/api/research/hrt?runId=${run.runId}`)).status,409);

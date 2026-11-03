@@ -20,6 +20,28 @@ try{
   page.on("pageerror",e=>errors.push(e.message));await page.goto(base);
   await page.getByLabel("Username",{exact:true}).fill("admin");await page.getByLabel("Password",{exact:true}).fill(password);await page.getByRole("button",{name:/Continue/}).click();
   const study=page.locator(".hr-workspace");await study.getByText("Research model ready",{exact:true}).waitFor();
+  assert.equal(await study.getByLabel("Scenario mode",{exact:true}).inputValue(),"automatic");
+  let previous=24,previousProduction;
+  const automaticRuns=[];
+  for(let i=0;i<3;i++){
+    const pending=page.waitForResponse(r=>r.url().endsWith("/api/research/hrt")&&r.request().method()==="POST");
+    await study.getByRole("button",{name:"Run HRT study",exact:true}).first().click();
+    const current=await (await pending).json();
+    await study.locator(".hr-footer").filter({hasText:current.runId.slice(0,8)}).waitFor();
+    assert.equal(current.scenario.mode,"automatic");
+    assert.ok(Math.abs(current.comparison.hrtHours-previous)>=1-1e-10);
+    for(const key of ["biogasM3Day","methaneM3Day","electricityKwhDay"]){
+      const shown=Number((await study.locator(`[data-metric="${key}"] strong`).innerText()).replaceAll(",",""));
+      assert.ok(Math.abs(shown-current.comparison[key])<=.051,`${key} must show this scenario's actual prediction`);
+    }
+    const production=await study.locator(".hr-kpis strong").allTextContents();
+    if(previousProduction)assert.notDeepEqual(production,previousProduction);
+    assert.equal(await study.locator(".hr-stale").count(),0);
+    automaticRuns.push({runId:current.runId,hrtHours:current.comparison.hrtHours,production});
+    previous=current.comparison.hrtHours;previousProduction=production;
+  }
+  await page.screenshot({path:path.join(out,"automatic-scenario-1440.png"),fullPage:true});
+  await study.getByLabel("Scenario mode",{exact:true}).selectOption("manual");
   assert.equal(await study.getByLabel("Comparison HRT (hours)",{exact:true}).inputValue(),"24");
   assert.equal(await page.getByRole("button",{name:"Day-scale reference",exact:true}).count(),0);
   let dayModelRequests=0;page.on("request",request=>{if(new URL(request.url()).pathname==="/api/predict")dayModelRequests++;});
@@ -71,6 +93,6 @@ try{
   await page.getByRole("button",{name:"Hours-scale research",exact:true}).click();assert.match(await study.locator(".hr-selected-time strong").innerText(),/12 hours/);
   assert.equal(dayModelRequests,0,"Dashboard navigation must not execute the original day-scale prediction route");
   assert.deepEqual(errors,[]);
-  const summary={status:"PASS",checkedAt:new Date().toISOString(),widths,checks:["hours model shared by dashboard, AI recommendations and Copilot","comparison HRT limited to 2–24 hours in the dashboard","explicit HRT increase and decrease","source pagination","synthetic evaluation disclosure","changed-input stale state","short-HRT methane/energy trade-off","2000-point export","saved record retrieval and 8 replay checks","original day models retained in Audit Trail only","responsive navigation without page overflow"],runId:run.runId,selectedHrtHours:run.selected.hrtHours,scope:"Local software verification with synthetic inputs; not plant validation"};
+  const summary={status:"PASS",checkedAt:new Date().toISOString(),widths,automaticRuns,checks:["each automatic click changes the HRT input and displayed fitted predictions","hours model shared by dashboard, AI recommendations and Copilot","comparison HRT limited to 2–24 hours in the dashboard","explicit HRT increase and decrease","source pagination","synthetic evaluation disclosure","changed-input stale state","short-HRT methane/energy trade-off","2000-point export","saved record retrieval and 8 replay checks","original day models retained in Audit Trail only","responsive navigation without page overflow"],runId:run.runId,selectedHrtHours:run.selected.hrtHours,scope:"Local software verification with synthetic inputs; not plant validation"};
   await writeFile(path.join(out,"summary.json"),JSON.stringify(summary,null,2));console.log(JSON.stringify(summary));
 }finally{if(browser)await browser.close();if(server.exitCode===null){const stopped=once(server,"exit");server.kill();await stopped;}await writeFile(path.join(out,"server.log"),logs);}
