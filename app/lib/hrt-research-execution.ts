@@ -1,14 +1,16 @@
-import {calculateResearch,researchArtifactHash,researchDataHash,researchManifestHash,researchOutputHash,type ResearchCalculation} from "./hrt-research";
+import {calculateResearch,resolveResearchRequest,researchArtifactHash,researchDataHash,researchManifestHash,researchOutputHash,type ResearchCalculation} from "./hrt-research";
 import {getEvidence,storeEvidence,storageProvider,verifyEvidence} from "./audit";
 import {fingerprint} from "./evidence";
 import type {AquaSession} from "./auth";
 
 export async function executeResearch(body:unknown,session:AquaSession){
   const started=performance.now(),runId=crypto.randomUUID(),createdAt=new Date().toISOString();
-  const calculated=calculateResearch(body);
+  const request=resolveResearchRequest(body);
+  if(request.scenario&&!request.scenario.seed)request.scenario.seed=runId;
+  const calculated=calculateResearch(request);
   const response={...calculated,runId,createdAt,outputHash:researchOutputHash(calculated),
     elapsedMs:Number((performance.now()-started).toFixed(3)),
-    trace:["Validate explicit units and research bounds","Evaluate the fitted synthetic trajectory","Search 2,000 points against the requested goal","Calculate comparison, recommendations, signed HRT change and energy potential","Fingerprint model, data, request and outputs"],
+    trace:["Validate explicit units and research bounds",calculated.scenario.mode==="automatic"?"Generate a new HRT input and preserve its replay seed":"Use the entered comparison HRT","Evaluate scenario production with the fitted synthetic model","Search 2,000 points against the requested goal","Calculate comparison, recommendations, signed HRT change and energy potential","Fingerprint model, data, request and outputs"],
     deployment:process.env.VERCEL_DEPLOYMENT_ID??process.env.VERCEL_URL??"local-development"};
   try{
     const record=await storeEvidence({id:runId,createdAt,username:session.username,role:session.role,kind:"hrt_research",request:body,inputs:calculated.request,response,
@@ -25,13 +27,13 @@ export async function verifyResearch(runId:string,session:AquaSession){
   if(!integrity)return {http:409,data:{error:"Stored evidence integrity failed"}};
   const saved=record.response as ResearchCalculation&{outputHash:string};
   if(saved.artifactHash!==researchArtifactHash||saved.dataHash!==researchDataHash||saved.manifestHash!==researchManifestHash)return {http:409,data:{error:"This record uses a different research model, dataset or engine build. Preserve and download its original evidence."}};
-  const replay=calculateResearch(record.request);
+  const replay=calculateResearch(record.inputs);
   const checks=[
     {name:"Stored record HMAC and SHA-256",passed:integrity},
     {name:"Current model and source dataset match",passed:saved.artifactHash===researchArtifactHash&&saved.dataHash===researchDataHash},
     {name:"Stored output fingerprint",passed:researchOutputHash(saved)===record.outputHash&&saved.outputHash===record.outputHash},
     {name:"Deterministic backend replay",passed:researchOutputHash(replay)===saved.outputHash},
-    {name:"Explicit baseline time conversion",passed:saved.retentionTime.beforeHours===saved.request.baseline.value*(saved.request.baseline.unit==="days"?24:1)},
+    {name:"Scenario input and explicit time units",passed:saved.retentionTime.beforeHours===replay.scenario.hrtHours&&saved.scenario.hrtHours===replay.scenario.hrtHours&&(!saved.request.scenario||saved.scenario.previousHrtHours===null||Math.abs(saved.scenario.hrtHours-saved.scenario.previousHrtHours)>=1-1e-10)},
     {name:"Hours-scale model bounds",passed:saved.selected.hrtHours>=2&&saved.selected.hrtHours<=24},
     {name:"Methane and electricity units",passed:Math.abs(saved.selected.electricityKwhDay-saved.selected.methaneM3Day*9.97*.36)<1e-9},
     {name:"Synthetic research status preserved",passed:saved.mode==="HOURS_RESEARCH"&&saved.validationStatus==="SYNTHETIC AGREEMENT ONLY"},
