@@ -9,8 +9,8 @@ type AuthUser={username:string;role:"admin"|"user"};
 const navigation:[ResearchView,string,string][]=[
   ["overview","⌂","Overview"],["workbook","▦","Workbook AI reading"],
   ["biogas","◒","Biogas"],["methane","◆","Methane"],["electricity","ϟ","Electricity"],
-  ["hrt","◷","HRT in hours"],["process","⌁","Process monitor"],["optimizer","✦","AI optimizer"],
-  ["reports","≡","AI & KPI reports"],["sources","▤","Data sources"],
+  ["process","⌁","Process monitor"],["hrt","◷","HRT in hours"],["optimizer","✦","AI optimizer"],
+  ["reports","≡","AI & KPI reports"],["alerts","△","Alerts"],["sources","▤","Data sources"],["settings","⚙","Settings"],
 ];
 
 export default function Home(){
@@ -50,7 +50,7 @@ export default function Home(){
     <aside className="simple-sidebar">
       <div className="simple-brand"><span>◒</span><b>AQUAIVOLT<small>WASTE TO ENERGY</small></b></div>
       <div className="research-mode-switch"><small>ACTIVE MODEL · HRT 2–24 HOURS</small><button className="selected" onClick={()=>openView()}>Hours-scale research</button></div>
-      <nav>{navigation.map(([key,icon,label])=><button key={key} aria-label={label} className={!auditOpen&&view===key?"active":""} onClick={()=>openView(key)}><span aria-hidden="true">{icon}</span>{label}</button>)}
+      <nav>{navigation.map(([key,icon,label])=><div key={key}>{["biogas","process","alerts"].includes(key)&&<div className="pd-nav-label">{key==="biogas"?"PRODUCTION OPTIMIZATION":key==="process"?"ANALYTICS":"SYSTEM"}</div>}<button aria-label={label} className={!auditOpen&&view===key?"active":""} onClick={()=>openView(key)}><span aria-hidden="true">{icon}</span>{label}</button></div>)}
         {auth.role==="admin"&&<button className={auditOpen?"active":""} onClick={()=>openAudit()}><span><ClipboardCheck size={17}/></span>Audit Trail</button>}
       </nav>
       <div className="side-note"><b>SYSTEM STATUS</b><span>HOURS-SCALE MODEL</span><small>500 synthetic source rows<br/>PLC / IoT not connected</small></div>
