@@ -1,0 +1,53 @@
+"use client";
+import {useState,type CSSProperties} from "react";
+import {ArrowRight,Database,Flame,Leaf,Radio,ShieldCheck,Zap} from "lucide-react";
+import type {ResearchResult} from "../lib/hrt-research-execution";
+import "./production-dashboard.css";
+type View="overview"|"biogas"|"methane"|"electricity";
+type Metric="biogasM3Day"|"methaneM3Day"|"electricityKwhDay";
+type Period="curve"|"day"|"month"|"year";
+const n=(v:number|null|undefined,d=1)=>v===null||v===undefined?"—":v.toLocaleString(undefined,{maximumFractionDigits:d});
+const info={biogasM3Day:{name:"Biogas",unit:"m³/day",color:"#0989df"},methaneM3Day:{name:"Methane",unit:"m³ CH₄/day",color:"#099b87"},electricityKwhDay:{name:"Electricity",unit:"kWh/day",color:"#c58d1c"}};
+export default function ProductionDashboard({view,result,onView}:{view:View;result:ResearchResult|null;onView:(view:"sources"|"workbook"|"optimizer"|"process")=>void}){
+ const [period,setPeriod]=useState<Period>("curve"),p=result?.comparison,s=result?.selected;
+ const metric:Metric=view==="methane"?"methaneM3Day":view==="electricity"?"electricityKwhDay":"biogasM3Day";
+ let cards=[
+  {label:"Current biogas production",value:p?.biogasM3Day,unit:"m³/day",detail:`AI selected ${n(s?.biogasM3Day)} m³/day`,key:"biogasM3Day",icon:<Flame/>},
+  {label:"Current methane output",value:p?.methaneM3Day,unit:"m³ CH₄/day",detail:`${n(p?.methanePct)}% methane content`,key:"methaneM3Day",icon:<Leaf/>},
+  {label:"Electricity potential",value:p?.electricityKwhDay,unit:"kWh/day",detail:`AI selected ${n(s?.electricityKwhDay)} kWh/day`,key:"electricityKwhDay",icon:<Zap/>},
+  view==="biogas"?{label:"Modelled H₂S difference",value:p?p.h2sBeforePpm-p.h2sAfterPpm:undefined,unit:"ppm",detail:"Synthetic before/after estimate",key:"h2s",icon:<ShieldCheck/>}:view==="methane"?{label:"Source stability index",value:p?.stabilityPct,unit:"/ 100",detail:"Synthetic index · not a safety rating",key:"stability",icon:<ShieldCheck/>}:view==="electricity"?{label:"Average power potential",value:p?p.electricityKwhDay/24:undefined,unit:"kW",detail:"36% assumed electrical efficiency",key:"power",icon:<Zap/>}:{label:"Current scenario HRT",value:p?.hrtHours,unit:"hours",detail:`AI selected ${n(s?.hrtHours,2)} hours`,key:"hrtHours",icon:<Radio/>}
+ ];
+ if(view==="biogas")cards=[cards[0],{label:"Modelled biogas change",value:p&&s?s.biogasM3Day-p.biogasM3Day:undefined,unit:"m³/day",detail:"AI selected minus current scenario",key:"biogasChange",icon:<Zap/>},{label:"Methane content",value:p?.methanePct,unit:"% CH₄",detail:`${n(p?.methaneM3Day)} m³ CH₄/day`,key:"methanePct",icon:<Leaf/>},cards[3]];
+ if(view==="electricity")cards=[cards[2],cards[1],{label:"Methane energy potential",value:p?p.methaneM3Day*9.97:undefined,unit:"kWh/day",detail:"9.97 kWh per m³ methane",key:"methaneEnergy",icon:<Flame/>},cards[3]];
+ return <div className={`pd-dashboard pd-${view}`}>
+  <div className="pd-kpis hr-kpis">{cards.map((c,i)=><article className={`pd-kpi pd-tone-${i}`} key={c.key} data-metric={c.key}><span>{c.icon}</span><div><h2>{c.label}</h2><strong>{n(c.value)}</strong> <em>{c.unit}</em><p>{c.detail}</p></div></article>)}</div>
+  <div className="pd-main-grid">
+   <section className="pd-panel pd-chart"><header><div><h2>{info[metric].name}: current scenario and AI selection</h2><p>{period==="curve"?"Fitted model across supported HRT values":"Constant-output projection from this saved run"}</p></div><nav aria-label="Production comparison period">{(["curve","day","month","year"] as Period[]).map(k=><button key={k} className={period===k?"active":""} onClick={()=>setPeriod(k)} aria-pressed={period===k}>{k==="curve"?"HRT curve":k[0].toUpperCase()+k.slice(1)}</button>)}</nav></header>{result?<ProductionChart result={result} metric={metric} period={period}/>:<div className="pd-empty"><Flame size={34}/><b>Run AI optimization to calculate production</b><p>The backend generates a scenario and evaluates the fitted model.</p></div>}</section>
+   <OperatingConditions result={result}/>
+   <section className="pd-panel pd-status"><header><h2>Model status</h2></header><div className="pd-ring" style={{"--pd-score":Math.max(0,Math.min(100,p?.stabilityPct??0)),"--pd-accent":info[metric].color} as CSSProperties}><b>{n(p?.stabilityPct)}</b><span>Source stability index</span></div><p className="pd-index-note">Synthetic estimate, not a safety score</p><dl><div><dt>Model</dt><dd>Quadratic Ridge</dd></div><div><dt>Evaluations</dt><dd>{result?"2,000":"—"}</dd></div><div><dt>Input coverage</dt><dd>2–24 hours</dd></div><div><dt>PLC / SCADA</dt><dd className="pd-warning">Not connected</dd></div></dl><button className="pd-text-button" onClick={()=>onView("optimizer")}>View AI recommendations <ArrowRight size={14}/></button></section>
+  </div>
+  <div className="pd-lower-grid">
+   <section className="pd-panel pd-feed"><header><div><h2><Radio size={18}/>Online process feed</h2><p>Future hardware / sensor connection</p></div><span className="pd-offline">NOT CONNECTED</span></header><div className="pd-feed-counts"><div><b>0</b><span>Live sources</span></div><div><b>0</b><span>Sensor files</span></div><div><b>—</b><span>Last sync</span></div></div><p className="pd-note">Production values are model predictions. No live sensors or equipment commands are connected.</p><button className="pd-text-button" onClick={()=>onView("process")}>Open Process Monitor <ArrowRight size={14}/></button></section>
+   <section className="pd-panel pd-workbook"><header><div><h2><Database size={18}/>Supplied workbook AI feed</h2><p>Calculated scenarios from the hours model</p></div><button className="pd-text-button" onClick={()=>onView("workbook")}>Open source</button></header><div className="pd-feed-counts"><div><b>500</b><span>Synthetic source rows</span></div><div><b>{result?"2,000":"—"}</b><span>Model evaluations</span></div><div><b>{result?.audit.saved?"Saved":"—"}</b><span>Audit status</span></div></div><div className="pd-table-scroll"><table><thead><tr><th>Candidate</th><th>HRT</th><th>{info[metric].name}</th><th>Status</th></tr></thead><tbody>{result?result.candidatePreview.slice(0,4).map((v,i)=><tr key={v.hrtHours}><td>#{i+1}</td><td>{n(v.hrtHours,2)} h</td><td>{n(v[metric])} {info[metric].unit}</td><td>Calculated</td></tr>):<tr><td colSpan={4}>No completed model run</td></tr>}</tbody></table></div><p className="pd-note">Candidates nearest the selected objective. Evaluations are not independent training records.</p></section>
+   <section className="pd-panel pd-data-status"><header><h2>Data & AI status</h2></header><article><Database size={20}/><div><b>Research workbook</b><p>500 synthetic rows. HRT is the independent model input.</p></div></article><article><Zap size={20}/><div><b>AI optimization</b><p>2,000 model evaluations compared against the selected goal.</p></div></article><article><ShieldCheck size={20}/><div><b>Plant validation pending</b><p>No calibrated prediction intervals or independent plant accuracy yet.</p></div></article><button className="pd-text-button" onClick={()=>onView("sources")}>Data sources & evaluation <ArrowRight size={14}/></button></section>
+  </div>
+ </div>;
+}
+export function OperatingConditions({result}:{result:ResearchResult|null}){
+ return <section className="pd-panel pd-conditions hr-recommendations" aria-label="AI recommendations"><header><div><h2>Key operating conditions</h2><p>Current scenario → AI selected</p></div></header>{result?result.recommendations.map(item=><div className="pd-condition" key={item.key} data-parameter={item.key}><div><b>{item.label}</b><span>{n(item.current,2)} → <strong>{n(item.target,2)}</strong> {item.unit}</span></div><div className="pd-meter"><i style={{width:`${Math.min(100,Math.max(8,Math.abs(item.target)/Math.max(Math.abs(item.current??0),Math.abs(item.target),1)*100))}%`}}/></div><small>{item.change===null?"Comparison unavailable":`${item.change>0?"+":""}${n(item.change,2)} ${item.unit}${item.key==="hrtHours"?` (${result.retentionTime.direction})`:""}`}</small></div>):<p className="pd-note">Run the model to compare current and recommended scenario conditions.</p>}<p className="pd-note">Settings vary together in the source trajectory; separate control effects are not established.</p></section>;
+}
+function ProductionChart({result,metric,period}:{result:ResearchResult;metric:Metric;period:Period}){
+ const meta=info[metric],current=result.comparison;
+ if(period!=="curve"){
+  const factor=period==="year"?365:period==="month"?30:1,unit=meta.unit.replace("/day",`/${period}`),max=Math.max(result.selected[metric],current?.[metric]??0,1);
+  return <div className="pd-total-chart"><p>{period==="month"?"30-day":period==="year"?"365-day":"Daily"} potential at constant modelled output</p>{[{label:"Current scenario",value:current?.[metric],color:"#8397a9"},{label:"AI selected",value:result.selected[metric],color:meta.color}].map(row=><div key={row.label}><span>{row.label}</span><b>{n(row.value===undefined?undefined:row.value*factor)} {unit}</b><i style={{width:`${(row.value??0)/max*100}%`,background:row.color}}/></div>)}<small>Projection only. This is not measured operating history.</small></div>;
+ }
+ const values=result.curve.map(p=>p[metric]),low=Math.min(...values)*.93,high=Math.max(...values)*1.06,w=720,h=310,left=65,right=24,top=20,bottom=48;
+ const x=(hour:number)=>left+(hour-2)/22*(w-left-right),y=(v:number)=>h-bottom-(v-low)/(high-low)*(h-top-bottom);
+ return <div className="pd-curve"><svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`${meta.name} model curve versus HRT in hours`}>
+  {[0,.25,.5,.75,1].map(t=><g key={t}><line x1={left} x2={w-right} y1={y(low+(high-low)*t)} y2={y(low+(high-low)*t)}/><text x={left-10} y={y(low+(high-low)*t)+4} textAnchor="end">{n(low+(high-low)*t)}</text></g>)}
+  {[2,6,10,14,18,24].map(hour=><text key={hour} x={x(hour)} y={h-20} textAnchor="middle">{hour} h</text>)}
+  {current&&<><line className="pd-current-line" x1={left} x2={w-right} y1={y(current[metric])} y2={y(current[metric])}/><circle cx={x(current.hrtHours)} cy={y(current[metric])} r={6} fill="#8498a9"/></>}
+  <polyline points={result.curve.map(p=>`${x(p.hrtHours)},${y(p[metric])}`).join(" ")} style={{stroke:meta.color}}/><circle cx={x(result.selected.hrtHours)} cy={y(result.selected[metric])} r={7} fill="#009b83"/>
+ </svg><div className="pd-chart-key"><span><i style={{background:meta.color}}/>Fitted HRT trajectory</span><span><i style={{background:"#8397a9"}}/>Current scenario</span><span><i style={{background:"#009b83"}}/>AI selected</span><b>{meta.unit}</b></div><p className="pd-note">Changing the scenario changes predictions. The same goal can select the same optimum.</p></div>;
+}

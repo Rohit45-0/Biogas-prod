@@ -25,11 +25,13 @@ try{
   page.on("pageerror",error=>errors.push(error.message));
   await page.goto(base);const study=page.locator(".hr-workspace");
   await study.getByText("Research model ready",{exact:true}).waitFor();
-  assert.equal(await study.getByLabel("Scenario mode",{exact:true}).inputValue(),"automatic");
+  const settings=study.getByRole("button",{name:"Study settings",exact:true});
+  assert.equal(await settings.getAttribute("aria-expanded"),"false");await settings.click();
+  assert.equal(await study.getByLabel("Scenario mode",{exact:true}).inputValue(),"automatic");await settings.click();
   const runs=[];let previous=24,previousProduction;
   for(let i=0;i<3;i++){
     const pending=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/research/hrt"&&r.request().method()==="POST",{timeout:60000});
-    await study.getByRole("button",{name:"Run HRT study",exact:true}).first().click();
+    await study.locator(".hr-header-actions").getByRole("button",{name:"Run AI optimization",exact:true}).click();
     const response=await pending;assert.equal(response.status(),200);const run=await response.json();
     assert.equal(run.engineHash,build.sourceHash,"The deployed backend must match this checkout");
     assert.equal(run.audit.saved,true);assert.equal(run.audit.provider,"vercel-private-blob");
@@ -39,10 +41,10 @@ try{
     assert.equal(run.comparison.hrtHours,run.scenario.hrtHours);
     await study.locator(".hr-footer").filter({hasText:run.runId.slice(0,8)}).waitFor();
     for(const key of ["biogasM3Day","methaneM3Day","electricityKwhDay"]){
-      const shown=Number((await study.locator(`[data-metric="${key}"] strong`).innerText()).replaceAll(",",""));
+      const shown=Number((await study.locator(`.pd-kpi[data-metric="${key}"] strong`).innerText()).replaceAll(",",""));
       assert.ok(Math.abs(shown-run.comparison[key])<=.051,`${key} must display this run's prediction`);
     }
-    const displayed=await study.locator(".hr-kpis strong").allTextContents();
+    const displayed=await study.locator('.pd-kpi[data-metric="biogasM3Day"] strong, .pd-kpi[data-metric="methaneM3Day"] strong, .pd-kpi[data-metric="electricityKwhDay"] strong').allTextContents();
     if(previousProduction)assert.notDeepEqual(displayed,previousProduction);
     assert.equal(await study.locator(".hr-stale").count(),0);
     const saved=await context.request.get(base+`/api/audit?runId=${run.runId}`);assert.equal(saved.status(),200);
@@ -56,8 +58,21 @@ try{
     runs.push({runId:run.runId,hrtHours:run.scenario.hrtHours,biogasM3Day:run.comparison.biogasM3Day,methaneM3Day:run.comparison.methaneM3Day,electricityKwhDay:run.comparison.electricityKwhDay,recommendedHrtHours:run.selected.hrtHours,replay:report.status,deployment:run.deployment});
     previous=run.scenario.hrtHours;previousProduction=displayed;
   }
+  const sidebar=page.locator(".simple-sidebar");
+  await sidebar.getByRole("button",{name:"Process monitor",exact:true}).click();
+  const monitor=study.locator(".rpm-workspace");await monitor.waitFor();assert.match(await monitor.innerText(),/not connected/i);
+  await monitor.getByText("Model and audit identifiers",{exact:true}).click();
+  assert.ok((await monitor.locator(".rpm-identifiers").innerText()).includes(runs.at(-1).runId));
+  await monitor.getByText("Model and audit identifiers",{exact:true}).click();
+  await page.screenshot({path:path.join(out,"process-monitor.png"),fullPage:true});
+  await sidebar.getByRole("button",{name:"AI & KPI reports",exact:true}).click();
+  assert.equal(await study.locator(".rr-table-panel tbody tr").count(),12);assert.match(await study.locator(".rr-projection-note").innerText(),/not measured history/);
+  assert.equal(await study.locator(".rr-history-select").count(),3);
+  await page.screenshot({path:path.join(out,"reports.png"),fullPage:true});
+  await sidebar.getByRole("button",{name:"Alerts",exact:true}).click();await study.getByRole("heading",{name:"Supported HRT coverage: 2–24 hours",exact:true}).waitFor();
+  await sidebar.getByRole("button",{name:"Settings",exact:true}).click();assert.equal(await study.getByLabel("Scenario mode",{exact:true}).inputValue(),"automatic");
   assert.deepEqual(errors,[]);
-  const summary={status:"PASS",checkedAt:new Date().toISOString(),base,engineHash:build.sourceHash,runs,scope:"Three real browser clicks, changing synthetic inputs and fitted predictions, exact UI values, persisted evidence and passing replay. No plant measurements."};
+  const summary={status:"PASS",checkedAt:new Date().toISOString(),base,engineHash:build.sourceHash,runs,scope:"Three real browser clicks, changing synthetic inputs and fitted predictions, exact UI values, persisted evidence and passing replay; restored Process Monitor, Reports, Alerts and Settings available. No plant measurements."};
   await writeFile(path.join(out,"summary.json"),JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));
   await context.request.post(base+"/api/auth/logout");
 }finally{await browser.close();}

@@ -53,7 +53,7 @@ try{
   assert.match(await plant.innerText(),/REVIEW REQUIRED/);assert.equal(await plant.getByRole('cell',{name:'Not defined',exact:true}).count(),6);
   await page.screenshot({path:path.join(out,'desktop-plant-validation.png'),fullPage:true});
   await page.getByRole('button',{name:'Hours-scale research',exact:true}).click();const study=page.locator('.hr-workspace');
-  await study.getByRole('button',{name:'Run HRT study',exact:true}).first().click();await study.locator('.hr-selected-time strong').filter({hasText:'7.88'}).waitFor();
+  await study.locator('.hr-header-actions').getByRole('button',{name:'Run AI optimization',exact:true}).click();await study.locator('.hr-selected-time strong').filter({hasText:'7.88'}).waitFor();
   assert.match(await study.locator('.hr-time-change').innerText(),/HRT change/);assert.doesNotMatch(await study.locator('.hr-time-change').innerText(),/HRT reduction|What AI improved/);
   await page.screenshot({path:path.join(out,'desktop-overview.png'),fullPage:true});
   const widths=[];
